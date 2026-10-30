@@ -1,0 +1,2945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Application Ledger</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --ink:#1B2430; --paper:#EDE6D6; --paper-line:#D9CFB8; --card:#F7F3E9;
+    --amber:#B9812E; --amber-deep:#8F5F1E; --sage:#5F7A5B; --sage-bg:#E4EAE1;
+    --rust:#9C4A34; --rust-bg:#F1E1DA; --slate:#5A6B85; --slate-bg:#E4E8EF; --muted:#6B6456;
+    --chat-canvas: #E7DFCE;
+    --chat-bubble-out: #D5ECCF;
+    --chat-bubble-in: #FFFFFF;
+    --chat-check: #3E8ED0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  a{color:inherit;}
+  .wrap{
+    width:100%;
+    max-width:1200px;
+    margin:0 auto;
+    padding:36px 28px 80px;
+    box-sizing:border-box;
+  }
+
+  header.ledger-head{border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;}
+  h1{font-family:'Source Serif 4', serif; font-weight:700; font-size:34px; margin:0 0 4px; letter-spacing:-0.01em;}
+  .tagline{color:var(--muted); font-size:14px; margin:0;}
+  .stats-row{display:flex; gap:22px; flex-wrap:wrap;}
+  .stat{text-align:right;}
+  .stat .n{font-family:'IBM Plex Mono', monospace; font-size:22px; font-weight:500; display:block; line-height:1;}
+  .stat .l{font-size:11px; color:var(--muted); display:block; margin-top:4px;}
+
+  /* Header Live Gmail Auto-Check Pill */
+  .autocheck-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--paper-line);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    transition: all .15s ease;
+    margin-bottom: 2px;
+  }
+  .autocheck-badge:hover {
+    border-color: var(--ink);
+    background: #fff;
+  }
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sage);
+    box-shadow: 0 0 0 0 rgba(95, 122, 91, 0.7);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(95, 122, 91, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(95, 122, 91, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(95, 122, 91, 0); }
+  }
+
+  .layout{display:grid; grid-template-columns:220px 1fr; gap:32px; width:100%;}
+  @media (max-width:850px){ .layout{grid-template-columns:1fr;} }
+
+  .sidebar h2{font-family:'Source Serif 4', serif; font-size:13px; font-weight:600; margin:0 0 10px; color:var(--muted);}
+  .filter-list{list-style:none; margin:0 0 28px; padding:0; border-top:1px solid var(--paper-line);}
+  .filter-list li{border-bottom:1px solid var(--paper-line);}
+  .filter-list button{width:100%; text-align:left; background:none; border:none; font-family:inherit; font-size:14px; padding:9px 4px; cursor:pointer; color:var(--ink); display:flex; justify-content:space-between; align-items:center;}
+  .filter-list button .count{font-family:'IBM Plex Mono', monospace; color:var(--muted); font-size:12px;}
+  .filter-list button.active{color:var(--amber-deep); font-weight:600;}
+  .side-actions{display:flex; flex-direction:column; gap:8px;}
+  .btn{font-family:inherit; font-size:13.5px; padding:9px 12px; border-radius:2px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); cursor:pointer; text-align:left; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; gap:5px;}
+  .btn:hover{background:#2B3648;}
+  .btn.secondary{background:none; color:var(--ink); border:1px solid var(--paper-line);}
+  .btn.secondary:hover{border-color:var(--ink); background:rgba(0,0,0,0.03);}
+  .btn.ghost{background:none; border:none; color:var(--muted); text-decoration:underline; padding:6px 0; font-size:12.5px; cursor:pointer;}
+  .btn:disabled{opacity:.5; cursor:default;}
+
+  main{min-width:0;}
+  .empty-state{border:1px dashed var(--paper-line); padding:40px 24px; text-align:center; color:var(--muted); font-size:14px;}
+  .empty-state strong{display:block; color:var(--ink); font-family:'Source Serif 4',serif; font-size:17px; margin-bottom:6px;}
+
+  /* Main Ledger Table */
+  table.ledger{width:100%; border-collapse:collapse;}
+  table.ledger thead th{text-align:left; font-size:11.5px; color:var(--muted); font-weight:500; padding:0 10px 8px; border-bottom:2px solid var(--ink); cursor:pointer; user-select:none; white-space:nowrap;}
+  table.ledger thead th:hover{color:var(--ink);}
+  table.ledger tbody tr.row{border-bottom:1px solid var(--paper-line); cursor:pointer;}
+  table.ledger tbody tr.row:hover{background:var(--card);}
+  table.ledger tbody tr.row.expanded{background:var(--card); border-bottom:none;}
+  table.ledger td{padding:12px 10px; vertical-align:top; font-size:14px;}
+  td.company{font-weight:500;}
+  td.role{color:var(--muted);}
+  td.date{font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--muted); white-space:nowrap;}
+
+  .status-pill{display:inline-block; padding:3px 9px; border-radius:2px; font-size:11.5px; font-weight:500; white-space:nowrap;}
+  .status-Applied{background:var(--slate-bg); color:var(--slate);}
+  .status-Interviewing{background:#F3E6C6; color:var(--amber-deep);}
+  .status-Offer{background:var(--sage-bg); color:var(--sage);}
+  .status-Rejected{background:var(--rust-bg); color:var(--rust);}
+  .status-Ghosted{background:#E6E3DB; color:var(--muted);}
+
+  /* Unread notification indicator next to company */
+  .unread-badge{display:inline-block; background:var(--sage); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:6px; vertical-align:middle;}
+  .att-count-badge{display:inline-block; background:rgba(27,36,48,0.08); color:var(--ink); font-size:11px; font-weight:500; padding:1px 6px; border-radius:10px; margin-left:6px; vertical-align:middle;}
+
+  /* Expanded Row Detail Container */
+  tr.detail-row td{background:var(--card); padding:0; border-bottom:2px solid var(--paper-line);}
+  .detail-inner{padding:18px 20px 24px; border-top:1px dashed var(--paper-line);}
+  .detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px 20px; margin-bottom:16px;}
+  .field label{display:block; font-size:11px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+  .field input, .field select, .field textarea{width:100%; font-family:inherit; font-size:13.5px; padding:7px 9px; border:1px solid var(--paper-line); border-radius:2px; background:#fff; color:var(--ink);}
+  .field textarea{resize:vertical; min-height:55px;}
+  .detail-actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; border-top:1px solid var(--paper-line); padding-top:14px; margin-top:14px;}
+
+  /* =========================================================
+     Document Attachments Component
+     ========================================================= */
+  .attach-zone {
+    border: 1px dashed var(--paper-line);
+    background: #fff;
+    padding: 12px 14px;
+    border-radius: 2px;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+  .attach-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .attach-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card);
+    border: 1px solid var(--paper-line);
+    padding: 6px 10px;
+    border-radius: 2px;
+    font-size: 12.5px;
+  }
+  .attach-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 75%;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .attach-name:hover {
+    text-decoration: underline;
+  }
+  .attach-size {
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    margin-left: 6px;
+  }
+  .attach-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .attach-del {
+    color: var(--rust);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 5px;
+  }
+  .attach-del:hover {
+    font-weight: bold;
+  }
+
+  /* =========================================================
+     WhatsApp-Style Conversation Component (Embedded in Detail)
+     ========================================================= */
+  .conversation-container {
+    margin-top: 18px;
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--chat-canvas);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .conversation-header {
+    background: #E0D7C5;
+    border-bottom: 1px solid var(--paper-line);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .convo-title {
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .convo-subtitle {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* WhatsApp Stream & Canvas Pattern */
+  .chat-stream {
+    max-height: 420px;
+    min-height: 180px;
+    overflow-y: auto;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    background-color: var(--chat-canvas);
+    background-image: radial-gradient(#d3c9b4 0.75px, transparent 0.75px);
+    background-size: 16px 16px;
+  }
+
+  .date-pill {
+    align-self: center;
+    background: #E0D7C5;
+    border: 1px solid var(--paper-line);
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin: 4px 0;
+  }
+
+  .system-bubble {
+    align-self: center;
+    background: rgba(27,36,48,0.06);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* Outgoing & Incoming WhatsApp Message Bubbles */
+  .bubble-row {
+    display: flex;
+    width: 100%;
+    margin-bottom: 2px;
+  }
+  .bubble-row.outgoing {
+    justify-content: flex-end;
+  }
+  .bubble-row.incoming {
+    justify-content: flex-start;
+  }
+
+  .bubble {
+    max-width: 75%;
+    min-width: 140px;
+    padding: 9px 13px 7px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    word-break: break-word;
+    display: inline-flex;
+    flex-direction: column;
+  }
+
+  .bubble-row.outgoing .bubble {
+    background: var(--chat-bubble-out);
+    border: 1px solid #BFE0B7;
+    color: var(--ink);
+    border-top-right-radius: 1px;
+  }
+
+  .bubble-row.incoming .bubble {
+    background: var(--chat-bubble-in);
+    border: 1px solid var(--paper-line);
+    color: var(--ink);
+    border-top-left-radius: 1px;
+  }
+
+  .bubble-sender {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 3px;
+    color: var(--sage);
+  }
+  .bubble-row.outgoing .bubble-sender {
+    color: var(--amber-deep);
+  }
+
+  .bubble-subject {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 5px;
+    padding-bottom: 3px;
+    border-bottom: 1px dashed rgba(0,0,0,0.1);
+  }
+
+  .bubble-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 2px 0 4px;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+
+  .bubble-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 10.5px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .check-double {
+    color: var(--chat-check);
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  /* Status Suggestion Banner inside incoming message */
+  .status-suggestion-banner {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #FAF7F0;
+    border: 1px solid var(--paper-line);
+    border-radius: 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  /* WhatsApp Conversation Bottom Drafting Bar */
+  .chat-bottom {
+    background: #E0D7C5;
+    border-top: 1px solid var(--paper-line);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Template Chips Bar */
+  .template-chips-bar {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .template-chips-bar::-webkit-scrollbar { display: none; }
+  .chip-btn {
+    border: 1px solid var(--paper-line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 4px 9px;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .chip-btn:hover {
+    border-color: var(--ink);
+    background: var(--card);
+  }
+  .chip-btn.active {
+    background: var(--ink) !important;
+    color: var(--paper) !important;
+    border-color: var(--ink) !important;
+  }
+
+  /* Briefcase Items & Badges */
+  .briefcase-item {
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    padding: 10px 14px;
+    border-radius: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    transition: all .15s ease;
+  }
+  .briefcase-item:hover {
+    border-color: var(--ink);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .briefcase-tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    letter-spacing: 0.02em;
+    display: inline-block;
+  }
+  .briefcase-tag.Resume { background: var(--sage-bg); color: var(--sage); }
+  .briefcase-tag.CoverLetter { background: var(--slate-bg); color: var(--slate); }
+  .briefcase-tag.Portfolio { background: #FEF3C7; color: #92400E; }
+  .briefcase-tag.Certificate { background: #EDE9FE; color: #5B21B6; }
+  .briefcase-tag.Recommendation { background: #E0F2FE; color: #0369A1; }
+  .briefcase-tag.Other { background: #F3F4F6; color: #4B5563; }
+
+  /* Briefcase Picker in Attach Modal */
+  .briefcase-pick-item {
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    padding: 8px 12px;
+    border-radius: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all .12s ease;
+  }
+  .briefcase-pick-item:hover {
+    border-color: var(--ink);
+    background: var(--card);
+  }
+  .briefcase-pick-item.selected {
+    border-color: var(--amber-deep);
+    background: rgba(185, 129, 46, 0.08);
+    box-shadow: 0 0 0 1px var(--amber-deep);
+  }
+
+  .chat-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .chat-quick-input {
+    flex: 1;
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    outline: none;
+  }
+  .chat-quick-input:focus {
+    border-color: var(--ink);
+  }
+
+  /* =========================================================
+     Email Follow-Up Studio (Simple, Natural Email Layout)
+     ========================================================= */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(27,36,48,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal-box {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    width: 980px;
+    max-width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-header {
+    background: var(--card);
+    border-bottom: 1px solid var(--paper-line);
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h3 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 18px;
+    margin: 0;
+    font-weight: 700;
+  }
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-footer {
+    background: var(--card);
+    border-top: 1px solid var(--paper-line);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* Email Drafting Studio Split Grid */
+  .studio-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 820px) {
+    .studio-split { grid-template-columns: 1fr; }
+  }
+
+  /* Natural, simple email preview (as simple as a standard email, no unusual styling or borders) */
+  .natural-email-sheet {
+    background: #ffffff;
+    border: 1px solid var(--paper-line);
+    padding: 20px 22px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1e293b;
+    min-height: 250px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .natural-email-meta {
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #eeeeee;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .natural-email-meta div {
+    margin-bottom: 2px;
+  }
+  .natural-email-meta strong {
+    color: var(--ink);
+  }
+  .natural-email-body {
+    min-height: 140px;
+    white-space: pre-wrap;
+    font-size: 14px;
+  }
+  .natural-email-sign {
+    margin-top: 18px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .email-attach-chips {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--paper-line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Variable Insert Chips */
+  .var-chip {
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    font-size: 11.5px;
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 2px 6px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .var-chip:hover {
+    border-color: var(--ink);
+  }
+
+  .panel{border:1px solid var(--paper-line); background:var(--card); padding:18px 18px 20px; margin-bottom:20px;}
+  .panel h3{font-family:'Source Serif 4', serif; font-size:17px; margin:0 0 12px;}
+  .panel p.hint{font-size:12.5px; color:var(--muted); margin:6px 0 14px;}
+  .panel-actions{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  .parse-result{margin-top:14px; padding:12px 14px; background:#fff; border:1px solid var(--paper-line); font-size:13px;}
+  .parse-result .pr-row{margin-bottom:4px;}
+  .parse-result .pr-label{color:var(--muted); display:inline-block; width:80px;}
+
+  .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:2px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:150; max-width:80vw;}
+  .toast.show{opacity:1;}
+  .loading-note{color:var(--muted); font-size:13px; padding:20px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Classic Header with Live Auto-Check Pill -->
+  <header class="ledger-head">
+    <div>
+      <h1>Application Ledger</h1>
+      <p class="tagline">Every role you've applied to, and where it stands.</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <button class="autocheck-badge" id="briefcaseHeaderBtn" title="Open My Document Briefcase" style="background:#fff; font-weight:600; border-color:var(--ink);">
+        <span>💼 Briefcase</span>
+        <span id="briefcaseCountBadge" style="background:var(--ink); color:var(--paper); border-radius:10px; padding:1px 7px; font-size:11px; font-family:'IBM Plex Mono', monospace;">0</span>
+      </button>
+      <div class="autocheck-badge" id="accountPill" style="cursor:default;" title="Configured dynamically from .env">
+        <span id="accountLabel">📧 Loading account…</span>
+      </div>
+    <div class="autocheck-badge" id="autocheckPill" title="Checks Gmail in the background every 90s. Click to sync now.">
+        <span class="pulse-dot"></span>
+        <span id="autocheckLabel">Gmail Auto-check: Active</span>
+        <span id="syncSpin" style="display:inline-block; transition:transform .4s ease;">🔄</span>
+      </div>
+    <div class="stats-row" id="statsRow"></div>
+    </div>
+    </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Status</h2>
+      <ul class="filter-list" id="filterList"></ul>
+
+      <h2>Actions</h2>
+      <div class="side-actions">
+        <button class="btn" id="btnNew">+ New application</button>
+        <button class="btn secondary" id="btnBriefcase">💼 My Briefcase</button>
+        <button class="btn secondary" id="btnPaste">📥 Onboard from email</button>
+        <button class="btn secondary" id="btnCheckAll">Check inbox for replies</button>
+        <button class="btn ghost" id="btnReset">Clear all data</button>
+      </div>
+    </aside>
+
+    <main id="mainArea">
+      <div class="loading-note" id="loadingNote">Loading your ledger…</div>
+    </main>
+  </div>
+    </div>
+    <!-- ================= MODALS ================= -->
+
+<!-- Email Drafting Studio Modal (Clean, natural layout) -->
+<div class="modal-overlay" id="draftStudioModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <h3>Email Follow-Up Studio</h3>
+        <p style="font-size:12px; color:var(--muted); margin:2px 0 0;">Draft your email and attach documents for the recruiter</p>
+      </div>
+    <button class="btn secondary" id="btnCloseStudio" style="padding:4px 8px;">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- Template Selector Chips -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; display:block; margin-bottom:6px;">Select Template</label>
+        <div class="template-chips-bar" id="studioTemplateChips">
+          <button class="chip-btn" data-tpl="followup">⚡ 1. Post-Application Follow-up</button>
+          <button class="chip-btn" data-tpl="thankyou">🙏 2. Post-Interview Thank You</button>
+          <button class="chip-btn" data-tpl="availability">📅 3. Interview Availability</button>
+          <button class="chip-btn" data-tpl="statuscheck">💼 4. Polite Status Check-in</button>
+          <button class="chip-btn" data-tpl="offer">🎉 5. Job Offer Appreciation</button>
+          <button class="chip-btn" data-tpl="custom">✏️ 6. Custom Letter</button>
+        </div>
+    </div>
+    <!-- Variable insert tags -->
+      <div style="margin-bottom:14px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+        <span style="font-size:11px; color:var(--muted);">Insert tag:</span>
+        <button class="var-chip" data-var="{Company}">+ {Company}</button>
+        <button class="var-chip" data-var="{Role}">+ {Role}</button>
+        <button class="var-chip" data-var="{RecipientName}">+ {RecipientName}</button>
+        <button class="var-chip" data-var="{MyName}">+ {MyName}</button>
+        <button class="var-chip" data-var="{MyEmail}">+ {MyEmail}</button>
+        <button class="var-chip" data-var="{Date}">+ {Date}</button>
+      </div>
+    <!-- Split Screen: Form (Left) & Natural Email Preview (Right) -->
+      <div class="studio-split">
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div class="field">
+            <label style="display:flex; justify-content:space-between; align-items:center;">
+              <span>From (Sender)</span>
+              <span style="font-weight:normal; font-size:11px; color:#2563eb;">⚡ Dynamically read from .env</span>
+            </label>
+            <input type="text" id="es_from" readonly style="background:#f8fafc; color:#334155; font-family:'IBM Plex Mono', monospace; font-size:12px; cursor:default;" title="Configured dynamically from .env">
+          </div>
+    <div class="field">
+            <label>Recipient (To)</label>
+            <input type="text" id="es_to" placeholder="recruiter@company.com">
+          </div>
+    <div class="field">
+            <label>Subject</label>
+            <input type="text" id="es_subject">
+          </div>
+    <div class="field" style="flex:1; display:flex; flex-direction:column;">
+            <label>Message Text</label>
+            <textarea id="es_body" style="flex:1; min-height:180px;"></textarea>
+          </div>
+    <div class="field">
+            <label>Your Name (Signature)</label>
+            <input type="text" id="es_senderName" placeholder="Your Full Name">
+          </div>
+    <!-- Attach Documents (Briefcase + Job Files) -->
+          <div class="field" id="es_attachments_wrap">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label style="margin:0;">Attach documents to this email</label>
+              <button type="button" class="btn secondary" id="btnOpenBriefcaseFromStudio" style="padding:2px 8px; font-size:11px; cursor:pointer;">💼 Briefcase</button>
+            </div>
+    <!-- 1. From My Briefcase -->
+            <div style="background:#fff; border:1px solid var(--paper-line); padding:8px 10px; border-radius:2px; margin-bottom:8px;">
+              <div style="font-size:11px; font-weight:700; color:var(--amber-deep); text-transform:uppercase; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                <span>💼 From My Briefcase</span>
+                <span id="esBriefcaseCount" style="font-weight:normal; font-size:10.5px; color:var(--muted);">0 available</span>
+              </div>
+    <div id="es_briefcase_list" style="max-height:100px; overflow-y:auto; font-size:12px;">
+                <span style="color:var(--muted); font-size:11.5px;">No documents in your briefcase yet.</span>
+              </div>
+    </div>
+    <!-- 2. Application-specific attachments -->
+            <div style="background:#fff; border:1px solid var(--paper-line); padding:8px 10px; border-radius:2px;">
+              <div style="font-size:11px; font-weight:700; color:var(--slate); text-transform:uppercase; margin-bottom:6px;">
+                📁 Attached to this application
+              </div>
+    <div id="es_attachments_list" style="max-height:80px; overflow-y:auto; font-size:12px;">
+                <span style="color:var(--muted); font-size:11.5px;">No documents available for this application yet.</span>
+              </div>
+    </div>
+    </div>
+    </div>
+    <div>
+          <label style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; display:block; margin-bottom:6px;">Email Preview (As sent to recruiter)</label>
+          <div class="natural-email-sheet">
+            <div class="natural-email-meta">
+              <div><strong>From:</strong> <span id="previewFrom">you@gmail.com</span></div>
+    <div><strong>To:</strong> <span id="previewTo">recruiter@company.com</span></div>
+    <div><strong>Subject:</strong> <span id="previewSubject">Subject line</span></div>
+    </div>
+    <div class="natural-email-body" id="previewBody">
+              Message text preview...
+            </div>
+    <div class="natural-email-sign" id="previewSender">
+              Job Applicant
+            </div>
+    <div class="email-attach-chips" id="previewAttList" style="display:none;">
+              📎 Attachments: <span id="previewAttNames"></span>
+            </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn secondary" id="btnCancelStudio">Cancel</button>
+      <button class="btn secondary" id="btnCopyStudio">Copy Text</button>
+      <button class="btn" id="btnSendStudio">Send via Gmail</button>
+    </div>
+    </div>
+    </div>
+
+<!-- Document Briefcase Modal (Master Resumes, Cover Letters, Credentials) -->
+<div class="modal-overlay" id="briefcaseModal">
+  <div class="modal-box" style="width: 840px; max-width: 95vw;">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:26px;">💼</span>
+        <div>
+          <h3 style="margin:0;">My Document Briefcase</h3>
+          <p style="font-size:12px; color:var(--muted); margin:2px 0 0;">Store your master resumes, cover letters, and credentials to attach anytime when emailing.</p>
+        </div>
+      </div>
+      <button class="btn secondary" id="btnCloseBriefcase" style="padding:4px 8px;">×</button>
+    </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:18px;">
+      <!-- Quick Upload Form -->
+      <div style="background:var(--card); border:1px solid var(--paper-line); padding:16px; border-radius:2px;">
+        <div style="font-family:'Source Serif 4', serif; font-size:15px; font-weight:600; margin-bottom:10px;">
+          + Add Document to Briefcase
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 180px auto; gap:12px; align-items:flex-end;">
+          <div>
+            <label style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; display:block; margin-bottom:4px;">Select File (PDF, DOCX, TXT, etc.)</label>
+            <input type="file" id="bf_fileInput" style="font-size:12px; width:100%; border:1px solid var(--paper-line); padding:6px; background:#fff;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; display:block; margin-bottom:4px;">Document Type</label>
+            <select id="bf_category" style="width:100%; font-size:12.5px; padding:7px 8px; border:1px solid var(--paper-line); background:#fff; font-family:inherit;">
+              <option value="Resume">📄 Resume / CV</option>
+              <option value="Cover Letter">✉️ Cover Letter</option>
+              <option value="Portfolio">🌟 Portfolio / Sample</option>
+              <option value="Certificate">🎓 Certificate / Degree</option>
+              <option value="Recommendation">📝 Recommendation</option>
+              <option value="Other">📎 Other Document</option>
+            </select>
+          </div>
+          <button class="btn" id="btnUploadBriefcase" style="white-space:nowrap; padding:8px 16px; font-size:13px;">
+            Upload File
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Chips & List -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;" id="bfFilterChips">
+            <button class="chip-btn active" data-filter="all">All (<span id="bfCountAll">0</span>)</button>
+            <button class="chip-btn" data-filter="Resume">📄 Resumes (<span id="bfCountResume">0</span>)</button>
+            <button class="chip-btn" data-filter="Cover Letter">✉️ Cover Letters (<span id="bfCountCoverLetter">0</span>)</button>
+            <button class="chip-btn" data-filter="Portfolio">🌟 Portfolio (<span id="bfCountPortfolio">0</span>)</button>
+            <button class="chip-btn" data-filter="Certificate">🎓 Certificates (<span id="bfCountCertificate">0</span>)</button>
+            <button class="chip-btn" data-filter="Other">📎 Other (<span id="bfCountOther">0</span>)</button>
+          </div>
+        </div>
+
+        <div id="briefcaseListContainer" style="display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; padding-right:2px;">
+          <div style="padding:24px; text-align:center; color:var(--muted); font-size:13px;">Loading briefcase documents…</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn secondary" id="btnDoneBriefcase">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Attach Document from Briefcase Modal -->
+<div class="modal-overlay" id="attachBriefcaseModal">
+  <div class="modal-box" style="width: 740px; max-width: 95vw;">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:26px;">💼</span>
+        <div>
+          <h3 style="margin:0;">Attach from Briefcase</h3>
+          <p style="font-size:12px; color:var(--muted); margin:2px 0 0;" id="abTargetSubtitle">Select a master document and optionally rename it as you attach.</p>
+        </div>
+      </div>
+      <button class="btn secondary" id="btnCloseAttachBriefcase" style="padding:4px 8px;">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+      
+      <!-- Category Filter Chips & Manage Link -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div class="template-chips-bar" id="abFilterChips" style="margin:0;">
+          <button class="chip-btn active" data-abfilter="all">All</button>
+          <button class="chip-btn" data-abfilter="Resume">📄 Resumes</button>
+          <button class="chip-btn" data-abfilter="Cover Letter">✉️ Cover Letters</button>
+          <button class="chip-btn" data-abfilter="Portfolio">🌟 Portfolios</button>
+          <button class="chip-btn" data-abfilter="Certificate">🎓 Certificates</button>
+          <button class="chip-btn" data-abfilter="Recommendation">📝 Recommendation</button>
+          <button class="chip-btn" data-abfilter="Other">📎 Other</button>
+        </div>
+        <button type="button" class="btn secondary" style="font-size:11px; padding:3px 8px;" id="abManageBriefcaseBtn">Manage Briefcase ↗</button>
+      </div>
+
+      <!-- Document List Container -->
+      <div id="abDocsList" style="display:flex; flex-direction:column; gap:6px; max-height:230px; overflow-y:auto; border:1px solid var(--paper-line); background:#fff; padding:8px; border-radius:2px;">
+        <div style="padding:20px; text-align:center; color:var(--muted); font-size:12.5px;">Loading briefcase documents…</div>
+      </div>
+
+      <!-- Rename Section -->
+      <div id="abRenameSection" style="background:var(--card); border:1px solid var(--paper-line); padding:12px 14px; border-radius:2px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="font-size:11.5px; font-weight:700; color:var(--amber-deep); text-transform:uppercase; margin:0;">
+            Rename file as you attach (optional)
+          </label>
+          <span style="font-size:11px; color:var(--muted); font-family:'IBM Plex Mono', monospace;" id="abOriginalNameHint"></span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="ab_fileName" placeholder="Select a document above to customize filename…" style="flex:1; font-weight:600; font-family:'IBM Plex Mono', monospace; font-size:13px; padding:7px 10px; border:1px solid var(--paper-line); border-radius:2px; background:#fff; outline:none;">
+          <button type="button" class="btn secondary" id="ab_btn_reset_name" style="font-size:11.5px; padding:7px 10px; white-space:nowrap;" title="Reset to original filename">Reset Name</button>
+        </div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.4;">
+          💡 <strong>Tip:</strong> You can customize this filename for this specific application (e.g. <code>Wilson_Resume_Company.pdf</code>). The original document in your Briefcase will keep its original name.
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+      <span id="abSelectionHint" style="font-size:12px; color:var(--muted);">Select a document from above</span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn secondary" id="btnCancelAttachBriefcase">Cancel</button>
+        <button class="btn" id="btnConfirmAttachBriefcase" disabled>Attach Document</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+    <script>
+const STATUSES = ["Applied","Interviewing","Offer","Rejected","Ghosted"];
+let jobs = [];
+let currentFilter = "All";
+let sortKey = "dateApplied";
+let sortDir = "desc";
+let expandedId = null;
+let currentConvoMessages = {}; // id -> messages array
+let currentJobAttachments = {}; // id -> attachments array
+let isChecking = false;
+let appConfig = { email: '', senderName: '', hasCreds: false };
+let userSenderName = localStorage.getItem('user_sender_name') || '';
+
+/* Pre-defined Email Templates */
+const TEMPLATES = {
+  followup: {
+    subject: "Following up: {Role} application — {MyName}",
+    body: `Dear {RecipientName},
+
+I hope this email finds you well.
+
+I recently submitted my application for the {Role} position at {Company} and wanted to reiterate my enthusiastic interest in joining your team.
+
+With my background and experience, I am confident that I can make a meaningful contribution to your current initiatives. I would welcome the opportunity to discuss how my skill set aligns with your goals.
+
+Thank you very much for your time and consideration.
+
+Warm regards,
+{MyName}`
+  },
+
+  thankyou: {
+    subject: "Thank you — {Role} Interview with {Company}",
+    body: `Dear {RecipientName},
+
+Thank you very much for taking the time to speak with me today regarding the {Role} role at {Company}.
+
+I truly enjoyed learning more about the team's vision, culture, and upcoming projects. Our conversation reinforced my excitement about the opportunity to contribute to {Company}.
+
+Please let me know if you need any additional information or work samples from my side.
+
+Best regards,
+{MyName}`
+  },
+
+  availability: {
+    subject: "Availability for Interview — {Role} at {Company}",
+    body: `Dear {RecipientName},
+
+Thank you so much for the invitation to interview for the {Role} position at {Company}! I would be thrilled to connect.
+
+I am available during the following time windows (feel free to propose alternatives if these do not work):
+• Tuesday: 10:00 AM – 2:00 PM
+• Wednesday: 1:00 PM – 5:00 PM
+• Thursday: 10:00 AM – 4:00 PM
+
+Looking forward to speaking with you.
+
+Best regards,
+{MyName}`
+  },
+
+  statuscheck: {
+    subject: "Status inquiry: {Role} application at {Company}",
+    body: `Dear {RecipientName},
+
+I hope you are having a productive week.
+
+I am checking in to see if there are any updates regarding the hiring process for the {Role} position at {Company}.
+
+I remain very interested in the opportunity to join your team and would be happy to provide any further materials or details to assist in your evaluation.
+
+Thank you again for your time and guidance.
+
+Sincerely,
+{MyName}`
+  },
+
+  offer: {
+    subject: "Offer of Employment: {Role} at {Company} — Thank you",
+    body: `Dear {RecipientName},
+
+Thank you very much for extending the offer to join {Company} as {Role}. I am delighted and grateful for this opportunity.
+
+I am currently reviewing the details of the offer package. Would it be possible to schedule a brief call this week to go over a few clarifying questions regarding start date and compensation structure?
+
+Thank you again for your confidence in me.
+
+Warm regards,
+{MyName}`
+  },
+
+  custom: {
+    subject: "Regarding {Role} at {Company}",
+    body: `Dear {RecipientName},
+
+I am writing regarding the {Role} opportunity at {Company}.
+
+Best regards,
+{MyName}`
+  }
+};
+
+const mainArea = document.getElementById('mainArea');
+const statsRow = document.getElementById('statsRow');
+const filterList = document.getElementById('filterList');
+const toastEl = document.getElementById('toast');
+const autocheckPill = document.getElementById('autocheckPill');
+const autocheckLabel = document.getElementById('autocheckLabel');
+const syncSpin = document.getElementById('syncSpin');
+
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), 2800);
+}
+
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, now);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.35);
+  } catch(e){}
+}
+
+function triggerDesktopNotification(title, body, jobId) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      const n = new Notification(title, { body });
+      n.onclick = () => {
+        window.focus();
+        if (jobId) {
+          expandedId = jobId;
+          render();
+        }
+      };
+    } catch(e){}
+  }
+}
+
+async function api(path, opts){
+  const res = await fetch(path, opts);
+  let data = null;
+  try{ data = await res.json(); }catch{}
+  if(!res.ok){ throw new Error((data && data.error) || `Request failed (${res.status})`); }
+  return data;
+}
+
+async function loadConfig(){
+  try{
+    appConfig = await api('/api/config');
+    if(!localStorage.getItem('user_sender_name') && appConfig.senderName){
+      userSenderName = appConfig.senderName;
+    }
+    const accountLabel = document.getElementById('accountLabel');
+    if(accountLabel){
+      accountLabel.textContent = appConfig.email ? `📧 ${appConfig.email}` : 'No Gmail configured';
+    }
+    const accountPill = document.getElementById('accountPill');
+    if(accountPill){
+      accountPill.title = appConfig.email ? `Sender email: ${appConfig.email} (configured dynamically in .env)` : 'Set GMAIL_USER in .env';
+    }
+  }catch(e){
+    console.warn('Config load error:', e);
+  }
+}
+
+async function loadJobs(){
+  try{
+    jobs = await api('/api/jobs');
+  }catch(e){
+    mainArea.innerHTML = `<div class="empty-state"><strong>Couldn't reach the server.</strong>Make sure you ran <code>npm start</code> and this page is open at your localhost address.</div>`;
+    return;
+  }
+  render();
+  checkNotifications();
+}
+
+function emptyJob(){
+  return { id:null, company:'', role:'', dateApplied:new Date().toISOString().slice(0,10), status:'Applied', url:'', location:'', salary:'', contact:'', notes:'' };
+}
+
+/* ---------------- Rendering: Classic Ledger ---------------- */
+
+function render(){
+  renderStats(); renderFilters(); renderMain();
+}
+
+function renderStats(){
+  const total = jobs.length;
+  const counts = {}; STATUSES.forEach(s=>counts[s]=0);
+  jobs.forEach(j=>{ if(counts[j.status]!==undefined) counts[j.status]++; });
+  const responseRate = total ? Math.round(((total - counts.Applied)/total)*100) : 0;
+  statsRow.innerHTML = `
+    <div class="stat"><span class="n">${total}</span><span class="l">Total</span></div>
+    <div class="stat"><span class="n">${counts.Interviewing}</span><span class="l">Interviewing</span></div>
+    <div class="stat"><span class="n">${counts.Offer}</span><span class="l">Offers</span></div>
+    <div class="stat"><span class="n">${counts.Rejected}</span><span class="l">Rejected</span></div>
+    <div class="stat"><span class="n">${responseRate}%</span><span class="l">Response rate</span></div>`;
+}
+
+function renderFilters(){
+  const counts = {All: jobs.length};
+  STATUSES.forEach(s=>counts[s]=jobs.filter(j=>j.status===s).length);
+  filterList.innerHTML = ["All", ...STATUSES].map(s=>`
+    <li><button data-filter="${s}" class="${currentFilter===s?'active':''}">
+      <span>${s}</span><span class="count">${counts[s]}</span></button></li>`).join('');
+  filterList.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ currentFilter = btn.dataset.filter; expandedId = null; render(); });
+  });
+}
+
+function getFilteredSorted(){
+  let list = currentFilter==="All" ? [...jobs] : jobs.filter(j=>j.status===currentFilter);
+  list.sort((a,b)=>{
+    let av=a[sortKey]||'', bv=b[sortKey]||'';
+    if(sortKey==='dateApplied'){ av=new Date(av||0).getTime(); bv=new Date(bv||0).getTime(); }
+    else { av=String(av).toLowerCase(); bv=String(bv).toLowerCase(); }
+    if(av<bv) return sortDir==='asc'?-1:1;
+    if(av>bv) return sortDir==='asc'?1:-1;
+    return 0;
+  });
+  return list;
+}
+
+function renderMain(){
+  const list = getFilteredSorted();
+  if(jobs.length===0){
+    mainArea.innerHTML = `<div class="empty-state"><strong>Nothing logged yet.</strong>Add your first application, or paste in a confirmation email to get started.</div>`;
+    return;
+  }
+  if(list.length===0){
+    mainArea.innerHTML = `<div class="empty-state">No applications with status "${currentFilter}".</div>`;
+    return;
+  }
+  const arrow = (key)=> sortKey===key ? (sortDir==='asc'?' ↑':' ↓') : '';
+  let rows = '';
+  list.forEach(j=>{
+    const isExpanded = expandedId === j.id;
+    const unread = j.unreadCount || 0;
+    const attCount = j.attachmentsCount || 0;
+    rows += `<tr class="row ${isExpanded ? 'expanded' : ''}" data-id="${j.id}">
+      <td class="company">
+        ${escapeHtml(j.company)||'<em style="color:var(--muted)">Untitled</em>'}
+        ${unread > 0 ? `<span class="unread-badge" title="${unread} unread reply">${unread} new</span>` : ''}
+        ${attCount > 0 ? `<span class="att-count-badge" title="${attCount} attached documents">📎 ${attCount}</span>` : ''}
+      </td>
+      <td class="role">${escapeHtml(j.role)}</td>
+      <td class="date">${formatDate(j.dateApplied)}</td>
+      <td><span class="status-pill status-${j.status}">${j.status}</span></td></tr>`;
+    if(isExpanded){
+      rows += `<tr class="detail-row"><td colspan="4">${renderDetail(j)}</td></tr>`;
+    }
+  });
+  mainArea.innerHTML = `<table class="ledger"><thead><tr>
+      <th data-key="company">Company${arrow('company')}</th>
+      <th data-key="role">Role${arrow('role')}</th>
+      <th data-key="dateApplied">Applied${arrow('dateApplied')}</th>
+      <th data-key="status">Status${arrow('status')}</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+
+  mainArea.querySelectorAll('thead th').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const key = th.dataset.key;
+      if(sortKey===key){ sortDir = sortDir==='asc'?'desc':'asc'; } else { sortKey = key; sortDir = 'asc'; }
+      render();
+    });
+  });
+  mainArea.querySelectorAll('tr.row').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      const id = tr.dataset.id;
+      expandedId = expandedId===id ? null : id;
+      render();
+    });
+  });
+
+  attachDetailHandlers();
+}
+
+/* =========================================================
+   Render Expanded Detail Row with WhatsApp Conversation & Attachments
+   ========================================================= */
+
+function renderDetail(j){
+  return `<div class="detail-inner" data-detail-id="${j.id}">
+    <div class="detail-grid">
+      <div class="field"><label>Company</label><input type="text" data-f="company" value="${escapeAttr(j.company)}"></div>
+    <div class="field"><label>Role</label><input type="text" data-f="role" value="${escapeAttr(j.role)}"></div>
+    <div class="field"><label>Date applied</label><input type="date" data-f="dateApplied" value="${j.dateApplied||''}"></div>
+    <div class="field"><label>Status</label><select data-f="status">
+        ${STATUSES.map(s=>`<option value="${s}" ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>Location</label><input type="text" data-f="location" value="${escapeAttr(j.location)}" placeholder="Remote / City"></div>
+    <div class="field"><label>Salary range</label><input type="text" data-f="salary" value="${escapeAttr(j.salary)}"></div>
+    <div class="field"><label>Contact / recruiter email</label><input type="text" data-f="contact" value="${escapeAttr(j.contact)}" placeholder="recruiter@company.com"></div>
+    <div class="field"><label>Job posting URL</label><input type="text" data-f="url" value="${escapeAttr(j.url)}" placeholder="https://"></div>
+    </div>
+    <div class="field" style="margin-bottom:14px;"><label>Notes / Context</label><textarea data-f="notes">${escapeHtml(j.notes)}</textarea></div>
+    <!-- Attached Documents Section -->
+    <div class="field" style="margin-bottom:18px;">
+      <label>Attached Documents (Resume, Cover Letter, Portfolio, Job Description)</label>
+      <div class="attach-zone" id="detail_attach_zone_${j.id}">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <span style="font-size:12px; color:var(--muted);" id="att_count_${j.id}">Loading attachments…</span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn secondary" style="font-size:11.5px; padding:3px 9px;" id="df_btn_briefcase_${j.id}">💼 From Briefcase</button>
+            <input type="file" id="df_file_input_${j.id}" multiple accept=".pdf,.doc,.docx,.txt,.rtf,.png,.jpg,.jpeg" style="display:none;">
+            <button type="button" class="btn secondary" style="font-size:11.5px; padding:3px 9px;" id="df_btn_add_${j.id}">+ Upload file</button>
+          </div>
+        </div>
+        <div class="attach-list" id="att_list_${j.id}"></div>
+      </div>
+    </div>
+    <!-- WhatsApp-Style Conversation Section -->
+    <div class="conversation-container">
+      <div class="conversation-header">
+        <div>
+          <div class="convo-title">
+            <span>💬 Conversation & Follow-Ups</span>
+          </div>
+    <div class="convo-subtitle">${escapeHtml(j.contact || 'No recruiter contact set')}</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+          <button class="btn secondary" style="font-size:12px; padding:5px 9px;" data-action="sync-thread" title="Fetch entire conversation history (sent & received emails) from Gmail">
+            <span class="spin-icon">⚡</span> Sync thread
+          </button>
+          <button class="btn secondary" style="font-size:12px; padding:5px 9px;" data-action="check-replies">
+            <span class="spin-icon">🔄</span> Check replies
+          </button>
+          <button class="btn" style="font-size:12px; padding:5px 11px;" data-action="open-studio">
+            ✉️ Draft email
+          </button>
+        </div>
+    </div>
+    <!-- WhatsApp Messages Stream -->
+      <div class="chat-stream" id="chatStream_${j.id}">
+        <div class="system-bubble">Loading conversation thread…</div>
+    </div>
+    <!-- WhatsApp Bottom Bar with Template Chips -->
+      <div class="chat-bottom">
+        <div class="template-chips-bar">
+          <button class="chip-btn" data-convo-tpl="followup">⚡ Quick Follow-up</button>
+          <button class="chip-btn" data-convo-tpl="thankyou">🙏 Thank You Note</button>
+          <button class="chip-btn" data-convo-tpl="availability">📅 Availability Slots</button>
+          <button class="chip-btn" data-convo-tpl="statuscheck">💼 Status Check-in</button>
+          <button class="chip-btn" data-convo-tpl="offer">🎉 Offer Gratitude</button>
+        </div>
+    <div class="chat-input-row">
+          <input type="text" class="chat-quick-input" id="quickMsg_${j.id}" placeholder="Type a follow-up or pick a template above… (Press Enter to open studio)">
+          <button class="btn" style="padding:7px 12px; font-size:12.5px;" data-action="quick-send">Send</button>
+        </div>
+    </div>
+    </div>
+    <!-- Detail Action Bar -->
+    <div class="detail-actions">
+      ${j.url ? `<a class="btn secondary" href="${escapeAttr(j.url)}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
+      <button class="btn secondary" data-action="delete">Delete application</button>
+      <button class="btn" data-action="save">Save changes</button>
+    </div>
+  </div>`;
+}
+
+function attachDetailHandlers(){
+  const detail = mainArea.querySelector('.detail-inner');
+  if(!detail) return;
+  const id = detail.dataset.detailId;
+  const job = jobs.find(j=>j.id===id);
+  if(!job) return;
+
+  // Load WhatsApp messages & attachments for this job
+  loadConversationMessages(id);
+  loadJobAttachments(id);
+
+  // Attach from Briefcase trigger
+  const btnBriefcase = detail.querySelector(`#df_btn_briefcase_${id}`);
+  if(btnBriefcase){
+    btnBriefcase.addEventListener('click', () => {
+      openAttachBriefcaseModal({
+        targetType: 'job',
+        jobId: id,
+        company: job.company,
+        role: job.role
+      });
+    });
+  }
+
+  // Attachment upload trigger
+  const fileInput = detail.querySelector(`#df_file_input_${id}`);
+  const btnAddFile = detail.querySelector(`#df_btn_add_${id}`);
+  if(btnAddFile && fileInput){
+    btnAddFile.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      if(!files.length) return;
+      showToast('Uploading attachment(s)…');
+      for(const f of files){
+        await uploadSingleAttachment(id, f);
+      }
+      showToast('Attachment(s) uploaded.');
+      fileInput.value = '';
+      await loadJobAttachments(id);
+      await loadJobs();
+    });
+  }
+
+  // Quick template chip clicks
+  detail.querySelectorAll('[data-convo-tpl]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const tplKey = chip.dataset.convoTpl;
+      openStudioModal(job, tplKey);
+    });
+  });
+
+  // Open Studio button
+  detail.querySelector('[data-action="open-studio"]').addEventListener('click', () => {
+    openStudioModal(job, 'followup');
+  });
+
+  // Quick message input enter
+  const quickInput = detail.querySelector(`#quickMsg_${id}`);
+  if(quickInput){
+    quickInput.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){
+        openStudioModal(job, 'custom', quickInput.value.trim());
+      }
+    });
+  }
+  detail.querySelector('[data-action="quick-send"]').addEventListener('click', () => {
+    const val = quickInput ? quickInput.value.trim() : '';
+    openStudioModal(job, 'custom', val);
+  });
+
+  // Save changes
+  detail.querySelector('[data-action="save"]').addEventListener('click', async ()=>{
+    detail.querySelectorAll('[data-f]').forEach(el=>{ job[el.dataset.f] = el.value; });
+    try{ await api(`/api/jobs/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(job)}); }
+    catch(e){ showToast(e.message); return; }
+    showToast('Saved.'); render();
+  });
+
+  // Delete
+  detail.querySelector('[data-action="delete"]').addEventListener('click', async ()=>{
+    if(!confirm(`Delete the entry for ${job.company || 'this application'}?`)) return;
+    try{ await api(`/api/jobs/${id}`, {method:'DELETE'}); }
+    catch(e){ showToast(e.message); return; }
+    jobs = jobs.filter(j=>j.id!==id);
+    expandedId = null;
+    showToast('Deleted.'); render();
+  });
+
+  // Sync entire conversation thread from Gmail (sent & received)
+  const btnSyncThread = detail.querySelector('[data-action="sync-thread"]');
+  if(btnSyncThread){
+    btnSyncThread.addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const spin = btn.querySelector('.spin-icon');
+      if(spin) spin.style.transform = 'rotate(360deg)';
+      showToast('Fetching entire conversation from Gmail…');
+      try {
+        const res = await api(`/api/jobs/${job.id}/sync-thread`, { method: 'POST' });
+        if(res.syncedCount > 0){
+          playChime();
+          showToast(`Synced ${res.syncedCount} new message(s) in thread!`);
+        } else {
+          showToast(`Thread up to date (${res.totalMessages} messages).`);
+        }
+        await loadConversationMessages(id);
+        await loadJobs();
+      } catch(err) {
+        showToast(err.message);
+      } finally {
+        btn.disabled = false;
+        if(spin) spin.style.transform = 'none';
+      }
+    });
+  }
+
+  // Check inbox for replies for this company
+  detail.querySelector('[data-action="check-replies"]').addEventListener('click', async (e)=>{
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.querySelector('.spin-icon').style.transform = 'rotate(360deg)';
+    if(!job.company){ showToast('Add a company name first.'); btn.disabled = false; return; }
+    try{
+      const data = await api(`/api/check-replies?jobId=${job.id}`);
+      if(data.newCount > 0){
+        playChime();
+        showToast(`Found ${data.newCount} new reply!`);
+      } else {
+        showToast('No new replies found.');
+      }
+      await loadConversationMessages(id);
+      await loadJobs();
+    }catch(err){
+      showToast(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('.spin-icon').style.transform = 'none';
+    }
+  });
+}
+
+/* =========================================================
+   Document Attachments Helper Functions
+   ========================================================= */
+
+async function loadJobAttachments(jobId){
+  const listEl = document.getElementById(`att_list_${jobId}`);
+  const countEl = document.getElementById(`att_count_${jobId}`);
+  if(!listEl) return;
+  try{
+    const atts = await api(`/api/jobs/${jobId}/attachments`);
+    currentJobAttachments[jobId] = atts;
+    if(countEl){
+      countEl.textContent = atts.length ? `${atts.length} document${atts.length===1?'':'s'} attached` : 'No documents attached yet';
+    }
+    if(!atts.length){
+      listEl.innerHTML = `<span style="color:var(--muted); font-size:12px;">No documents attached yet. Click "+ Attach document" to add your Resume or CV.</span>`;
+      return;
+    }
+    listEl.innerHTML = atts.map(a => {
+      const sizeKb = Math.round(a.fileSize / 1024);
+      const sizeStr = sizeKb > 1024 ? (sizeKb/1024).toFixed(1) + ' MB' : sizeKb + ' KB';
+      return `
+        <div class="attach-item">
+          <a class="attach-name" href="/api/attachments/${a.id}/download" target="_blank" title="Download ${escapeAttr(a.fileName)}">
+            <span>📄</span>
+            <span>${escapeHtml(a.fileName)}</span>
+            <span class="attach-size">(${sizeStr})</span>
+          </a>
+          <div class="attach-actions">
+            <button type="button" class="btn secondary" style="font-size:11px; padding:2px 6px;" onclick="renameAttachmentPrompt('${a.id}','${jobId}','${escapeAttr(a.fileName)}')">✏️ Rename</button>
+            <a href="/api/attachments/${a.id}/download" target="_blank" class="btn secondary" style="font-size:11px; padding:2px 6px;">Open ↗</a>
+            <button type="button" class="attach-del" onclick="deleteAttachment('${a.id}','${jobId}')" title="Delete document">×</button>
+          </div>
+    </div>
+    `;
+    }).join('');
+  }catch(e){
+    if(listEl) listEl.innerHTML = `<span style="color:var(--rust); font-size:12px;">Could not load attachments.</span>`;
+  }
+}
+
+window.renameAttachmentPrompt = async function(attId, jobId, currentName){
+  const newName = prompt('Enter new filename for this document:', currentName);
+  if(!newName || newName.trim() === '' || newName.trim() === currentName) return;
+  try{
+    await api(`/api/attachments/${attId}/rename`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ newFileName: newName.trim() })
+    });
+    showToast('Attachment renamed.');
+    await loadJobAttachments(jobId);
+    await loadJobs();
+  }catch(e){
+    showToast(e.message);
+  }
+};
+
+async function uploadSingleAttachment(jobId, file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try{
+        const payload = {
+          fileName: file.name,
+          fileType: file.type || 'application/octet-stream',
+          fileData: reader.result
+        };
+        const res = await api(`/api/jobs/${jobId}/attachments`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        resolve(res);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+window.deleteAttachment = async function(attId, jobId){
+  if(!confirm('Delete this attached document?')) return;
+  try{
+    await api(`/api/attachments/${attId}`, {method:'DELETE'});
+    showToast('Document deleted.');
+    await loadJobAttachments(jobId);
+    await loadJobs();
+  }catch(e){ showToast(e.message); }
+};
+
+/* =========================================================
+   WhatsApp Conversation Messages Loader & Renderer
+   ========================================================= */
+
+async function loadConversationMessages(jobId){
+  const stream = document.getElementById(`chatStream_${jobId}`);
+  if(!stream) return;
+  try{
+    const msgs = await api(`/api/jobs/${jobId}/messages`);
+    currentConvoMessages[jobId] = msgs;
+    renderConversationMessages(jobId, msgs);
+    // Mark as read
+    const job = jobs.find(j=>j.id===jobId);
+    if(job && job.unreadCount > 0){
+      await api(`/api/jobs/${jobId}/mark-read`, {method:'POST'});
+      job.unreadCount = 0;
+      renderStats();
+    }
+  }catch(e){
+    stream.innerHTML = `<div class="system-bubble">Could not load messages.</div>`;
+  }
+}
+
+function renderConversationMessages(jobId, msgs){
+  const stream = document.getElementById(`chatStream_${jobId}`);
+  if(!stream) return;
+  const job = jobs.find(j=>j.id===jobId);
+
+  if(!msgs || msgs.length === 0){
+    stream.innerHTML = `
+      <div class="system-bubble">Application logged for ${escapeHtml(job?.role||'Role')} at ${escapeHtml(job?.company||'Company')}</div>
+      <div style="text-align:center; padding:30px 10px; color:var(--muted); font-size:13px;">
+        No emails sent yet. Click <strong>⚡ Quick Follow-up</strong> or <strong>Draft email</strong> below to send your first message!
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  let lastDate = '';
+
+  msgs.forEach(m => {
+    const dt = new Date(m.timestamp);
+    const dateFormatted = dt.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});
+    if(dateFormatted !== lastDate){
+      html += `<div class="date-pill">${dateFormatted}</div>`;
+      lastDate = dateFormatted;
+    }
+    const timeFormatted = dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+    if(m.direction === 'system'){
+      html += `<div class="system-bubble">${escapeHtml(m.body || m.subject)}</div>`;
+    } else if(m.direction === 'outgoing'){
+      // Outgoing WhatsApp Bubble (You -> Recruiter)
+      html += `
+        <div class="bubble-row outgoing">
+          <div class="bubble">
+            <div class="bubble-sender">${escapeHtml(m.sender || (appConfig.email ? `You (${appConfig.email})` : 'You'))}</div>
+            ${m.subject ? `<div class="bubble-subject">✉️ ${escapeHtml(m.subject)}</div>` : ''}
+            <div class="bubble-body">${escapeHtml(m.body)}</div>
+            <div class="bubble-footer">
+              <span>${timeFormatted}</span>
+              <span class="check-double" title="Sent & Delivered">✓✓</span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Incoming WhatsApp Bubble (Recruiter -> You)
+      const isSuggestion = m.statusHint && job && m.statusHint !== job.status;
+      html += `
+        <div class="bubble-row incoming">
+          <div class="bubble">
+            <div class="bubble-sender">${escapeHtml(m.sender || 'Recruiter')}</div>
+            ${m.subject ? `<div class="bubble-subject">📬 ${escapeHtml(m.subject)}</div>` : ''}
+            <div class="bubble-body">${escapeHtml(m.body)}</div>
+            ${isSuggestion ? `
+              <div class="status-suggestion-banner">
+                <span>✨ Suggestion: Recruiter response looks like <strong>${m.statusHint}</strong></span>
+                <button class="btn" style="padding:3px 8px; font-size:11px;" onclick="quickUpdateStatus('${jobId}','${m.statusHint}')">
+                  Set status to ${m.statusHint}
+                </button>
+              </div>
+            ` : ''}
+            <div class="bubble-footer">
+              <span>${timeFormatted}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  stream.innerHTML = html;
+  stream.scrollTop = stream.scrollHeight;
+}
+
+window.quickUpdateStatus = async function(jobId, newStatus){
+  const job = jobs.find(j=>j.id===jobId);
+  if(!job) return;
+  job.status = newStatus;
+  try{
+    await api(`/api/jobs/${jobId}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(job)});
+    showToast(`Status updated to ${newStatus}`);
+    render();
+  }catch(e){ showToast(e.message); }
+};
+
+/* =========================================================
+   Document Briefcase (Master Documents Management)
+   ========================================================= */
+
+let briefcaseDocuments = [];
+let briefcaseActiveFilter = 'all';
+const briefcaseModal = document.getElementById('briefcaseModal');
+const esBriefcaseList = document.getElementById('es_briefcase_list');
+const esBriefcaseCount = document.getElementById('esBriefcaseCount');
+const briefcaseCountBadge = document.getElementById('briefcaseCountBadge');
+
+function formatFileSize(bytes){
+  if(!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function getCategoryIcon(cat){
+  switch(cat){
+    case 'Resume': return '📄';
+    case 'Cover Letter': return '✉️';
+    case 'Portfolio': return '🌟';
+    case 'Certificate': return '🎓';
+    case 'Recommendation': return '📝';
+    default: return '📎';
+  }
+}
+
+async function loadBriefcaseDocuments(){
+  try{
+    briefcaseDocuments = await api('/api/briefcase');
+    updateBriefcaseCounters();
+    renderBriefcaseModalList();
+    renderStudioBriefcaseList();
+  }catch(e){
+    console.warn('Could not load briefcase documents:', e);
+  }
+}
+
+function updateBriefcaseCounters(){
+  const count = briefcaseDocuments.length;
+  if(briefcaseCountBadge) briefcaseCountBadge.textContent = count;
+  if(esBriefcaseCount) esBriefcaseCount.textContent = `${count} available`;
+
+  const counts = { all: count, Resume: 0, 'Cover Letter': 0, Portfolio: 0, Certificate: 0, Other: 0 };
+  briefcaseDocuments.forEach(d => {
+    if(counts[d.category] !== undefined) counts[d.category]++;
+    else counts.Other++;
+  });
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setEl('bfCountAll', counts.all);
+  setEl('bfCountResume', counts.Resume);
+  setEl('bfCountCoverLetter', counts['Cover Letter']);
+  setEl('bfCountPortfolio', counts.Portfolio);
+  setEl('bfCountCertificate', counts.Certificate);
+  setEl('bfCountOther', counts.Other);
+}
+
+function renderBriefcaseModalList(){
+  const container = document.getElementById('briefcaseListContainer');
+  if(!container) return;
+
+  let docs = briefcaseDocuments;
+  if(briefcaseActiveFilter !== 'all'){
+    docs = docs.filter(d => d.category === briefcaseActiveFilter);
+  }
+
+  if(!docs.length){
+    container.innerHTML = `
+      <div style="border:1px dashed var(--paper-line); padding:28px 16px; text-align:center; color:var(--muted); background:#fff; border-radius:2px;">
+        <span style="font-size:26px; display:block; margin-bottom:6px;">💼</span>
+        <strong style="color:var(--ink); display:block; font-size:14px; margin-bottom:4px;">No documents in this view</strong>
+        <p style="font-size:12px; margin:0;">Upload your master resumes, portfolios, or certificates above to quickly attach them to any email.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = docs.map(d => {
+    const icon = getCategoryIcon(d.category);
+    const catClass = (d.category || 'Other').replace(/[^a-zA-Z]/g, '');
+    const dateStr = new Date(d.uploadedAt).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});
+    const sizeStr = formatFileSize(d.fileSize);
+
+    return `
+      <div class="briefcase-item">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+          <span style="font-size:20px; flex-shrink:0;">${icon}</span>
+          <div style="min-width:0; flex:1;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-weight:600; font-size:13.5px; color:var(--ink); word-break:break-all;">${escapeHtml(d.fileName)}</span>
+              <span class="briefcase-tag ${catClass}">${escapeHtml(d.category || 'Document')}</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">
+              <span>${sizeStr}</span> • <span>Added ${dateStr}</span>
+              ${d.notes ? ` • <span style="font-style:italic;">"${escapeHtml(d.notes)}"</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+          <a href="/api/briefcase/${d.id}/download" target="_blank" class="btn secondary" style="padding:4px 9px; font-size:11.5px; text-decoration:none;">
+            Download
+          </a>
+          <button type="button" class="btn ghost" style="color:var(--rust); padding:4px 6px; font-size:11.5px;" onclick="deleteBriefcaseDoc('${d.id}')">
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderStudioBriefcaseList(){
+  if(!esBriefcaseList) return;
+  if(!briefcaseDocuments.length){
+    esBriefcaseList.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        <span style="color:var(--muted); font-size:12px;">Your Briefcase is empty.</span>
+        <button type="button" class="btn secondary" style="padding:2px 8px; font-size:11px;" onclick="openBriefcaseModal()">+ Add Docs</button>
+      </div>`;
+    return;
+  }
+
+  esBriefcaseList.innerHTML = briefcaseDocuments.map(d => {
+    const icon = getCategoryIcon(d.category);
+    const sizeStr = formatFileSize(d.fileSize);
+    return `
+      <div style="margin-bottom:6px; padding:5px 8px; border-radius:2px; background:rgba(0,0,0,0.015); border:1px solid var(--paper-line);">
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+          <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1;">
+            <input type="checkbox" value="${d.id}" data-filename="${escapeAttr(d.fileName)}" data-category="${escapeAttr(d.category)}" class="es-bf-check" id="bf_chk_${d.id}">
+            <span style="font-size:13px;">${icon}</span>
+            <span style="font-weight:500; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeAttr(d.fileName)}">${escapeHtml(d.fileName)}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <span style="font-size:10.5px; color:var(--muted);">${sizeStr}</span>
+            <span class="briefcase-tag ${(d.category||'Other').replace(/[^a-zA-Z]/g,'')}" style="font-size:9.5px; padding:1px 5px;">${escapeHtml(d.category)}</span>
+          </div>
+        </label>
+        <div class="es-bf-rename-box" id="bf_rename_box_${d.id}" style="display:none; margin-top:5px; padding-top:4px; border-top:1px dashed var(--paper-line); align-items:center; gap:6px;">
+          <span style="font-size:11px; color:var(--muted); white-space:nowrap;">✏️ Rename for email:</span>
+          <input type="text" class="es-bf-rename-input" id="bf_rename_${d.id}" value="${escapeAttr(d.fileName)}" style="font-size:11.5px; padding:3px 6px; flex:1; border:1px solid var(--paper-line); border-radius:2px; font-family:'IBM Plex Mono', monospace;">
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  esBriefcaseList.querySelectorAll('.es-bf-check').forEach(chk => {
+    chk.addEventListener('change', () => {
+      const box = document.getElementById(`bf_rename_box_${chk.value}`);
+      if(box) box.style.display = chk.checked ? 'flex' : 'none';
+      updateLivePreview();
+    });
+  });
+  esBriefcaseList.querySelectorAll('.es-bf-rename-input').forEach(inp => {
+    inp.addEventListener('input', updateLivePreview);
+  });
+}
+
+function openBriefcaseModal(){
+  loadBriefcaseDocuments();
+  if(briefcaseModal) briefcaseModal.classList.add('open');
+}
+
+function closeBriefcaseModal(){
+  if(briefcaseModal) briefcaseModal.classList.remove('open');
+  renderStudioBriefcaseList();
+  updateLivePreview();
+}
+
+window.openBriefcaseModal = openBriefcaseModal;
+
+window.deleteBriefcaseDoc = async function(docId){
+  if(!confirm('Remove this document from your Briefcase?')) return;
+  try{
+    await api(`/api/briefcase/${docId}`, {method:'DELETE'});
+    showToast('Document removed from Briefcase.');
+    await loadBriefcaseDocuments();
+  }catch(e){ showToast(e.message); }
+};
+
+async function uploadBriefcaseFile(file, category = 'Resume', notes = ''){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const payload = {
+          fileName: file.name,
+          fileType: file.type || 'application/octet-stream',
+          fileData: reader.result,
+          category,
+          notes
+        };
+        const res = await api('/api/briefcase', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        resolve(res);
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('btnUploadBriefcase')?.addEventListener('click', async ()=>{
+  const fileInput = document.getElementById('bf_fileInput');
+  const catInput = document.getElementById('bf_category');
+  const file = fileInput?.files?.[0];
+  if(!file){ showToast('Please select a document file to upload.'); return; }
+
+  const btn = document.getElementById('btnUploadBriefcase');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+
+  try{
+    await uploadBriefcaseFile(file, catInput?.value || 'Resume');
+    showToast(`Added "${file.name}" to your Briefcase!`);
+    fileInput.value = '';
+    await loadBriefcaseDocuments();
+  }catch(e){
+    showToast(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload File';
+  }
+});
+
+document.getElementById('briefcaseHeaderBtn')?.addEventListener('click', openBriefcaseModal);
+document.getElementById('btnBriefcase')?.addEventListener('click', openBriefcaseModal);
+document.getElementById('btnCloseBriefcase')?.addEventListener('click', closeBriefcaseModal);
+document.getElementById('btnDoneBriefcase')?.addEventListener('click', closeBriefcaseModal);
+document.getElementById('btnOpenBriefcaseFromStudio')?.addEventListener('click', openBriefcaseModal);
+
+document.querySelectorAll('#bfFilterChips .chip-btn').forEach(btn => {
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#bfFilterChips .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    briefcaseActiveFilter = btn.dataset.filter;
+    renderBriefcaseModalList();
+  });
+});
+
+/* =========================================================
+   Attach Document from Briefcase Modal & Operations
+   ========================================================= */
+
+const attachBriefcaseModal = document.getElementById('attachBriefcaseModal');
+const abDocsList = document.getElementById('abDocsList');
+const abFileNameInput = document.getElementById('ab_fileName');
+const abOriginalNameHint = document.getElementById('abOriginalNameHint');
+const abSelectionHint = document.getElementById('abSelectionHint');
+const btnConfirmAttachBriefcase = document.getElementById('btnConfirmAttachBriefcase');
+const abTargetSubtitle = document.getElementById('abTargetSubtitle');
+
+let currentAttachContext = null; // { targetType: 'job'|'newPanel', jobId, company, role, onAttach }
+let selectedAttachDocId = null;
+let attachModalActiveFilter = 'all';
+
+async function openAttachBriefcaseModal(context = {}){
+  currentAttachContext = context;
+  selectedAttachDocId = null;
+  attachModalActiveFilter = 'all';
+
+  if(abFileNameInput) abFileNameInput.value = '';
+  if(abOriginalNameHint) abOriginalNameHint.textContent = '';
+  if(abSelectionHint) abSelectionHint.textContent = 'Select a document from above';
+  if(btnConfirmAttachBriefcase){
+    btnConfirmAttachBriefcase.disabled = true;
+    btnConfirmAttachBriefcase.textContent = 'Attach Document';
+  }
+
+  // Update subtitle
+  if(abTargetSubtitle){
+    if(context.company){
+      abTargetSubtitle.textContent = `Select a briefcase document to attach for ${context.company}${context.role ? ` (${context.role})` : ''}. You can rename it below.`;
+    } else {
+      abTargetSubtitle.textContent = 'Select a master document and optionally rename it as you attach.';
+    }
+  }
+
+  // Reset filter buttons
+  document.querySelectorAll('#abFilterChips .chip-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.abfilter === 'all');
+  });
+
+  // Load documents
+  await loadBriefcaseDocuments();
+  renderAttachBriefcaseList();
+
+  if(attachBriefcaseModal) attachBriefcaseModal.classList.add('open');
+}
+
+function closeAttachBriefcaseModal(){
+  if(attachBriefcaseModal) attachBriefcaseModal.classList.remove('open');
+  currentAttachContext = null;
+  selectedAttachDocId = null;
+}
+
+function renderAttachBriefcaseList(){
+  if(!abDocsList) return;
+
+  let docs = briefcaseDocuments;
+  if(attachModalActiveFilter !== 'all'){
+    docs = docs.filter(d => d.category === attachModalActiveFilter);
+  }
+
+  if(!docs.length){
+    abDocsList.innerHTML = `
+      <div style="padding:22px 14px; text-align:center; color:var(--muted); font-size:12.5px;">
+        <span style="font-size:22px; display:block; margin-bottom:4px;">💼</span>
+        No documents found in this category.
+        <div style="margin-top:8px;">
+          <button type="button" class="btn secondary" style="font-size:11px; padding:3px 9px;" onclick="closeAttachBriefcaseModal(); openBriefcaseModal();">+ Upload to Briefcase</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  abDocsList.innerHTML = docs.map(d => {
+    const isSelected = selectedAttachDocId === d.id;
+    const icon = getCategoryIcon(d.category);
+    const catClass = (d.category || 'Other').replace(/[^a-zA-Z]/g, '');
+    const dateStr = new Date(d.uploadedAt).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});
+    const sizeStr = formatFileSize(d.fileSize);
+
+    return `
+      <div class="briefcase-pick-item ${isSelected ? 'selected' : ''}" data-doc-id="${d.id}">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+          <input type="radio" name="ab_doc_radio" value="${d.id}" ${isSelected ? 'checked' : ''} style="margin:0; cursor:pointer;">
+          <span style="font-size:18px; flex-shrink:0;">${icon}</span>
+          <div style="min-width:0; flex:1;">
+            <div style="font-weight:600; font-size:13px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(d.fileName)}">${escapeHtml(d.fileName)}</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:1px;">${sizeStr} • Added ${dateStr}</div>
+          </div>
+        </div>
+        <span class="briefcase-tag ${catClass}" style="flex-shrink:0;">${escapeHtml(d.category)}</span>
+      </div>
+    `;
+  }).join('');
+
+  abDocsList.querySelectorAll('.briefcase-pick-item').forEach(item => {
+    item.addEventListener('click', () => {
+      selectAttachDoc(item.dataset.docId);
+    });
+  });
+}
+
+function selectAttachDoc(docId){
+  selectedAttachDocId = docId;
+  const doc = briefcaseDocuments.find(d => d.id === docId);
+  if(!doc) return;
+
+  // Highlight selected
+  abDocsList.querySelectorAll('.briefcase-pick-item').forEach(item => {
+    const isThis = item.dataset.docId === docId;
+    item.classList.toggle('selected', isThis);
+    const radio = item.querySelector('input[type="radio"]');
+    if(radio) radio.checked = isThis;
+  });
+
+  // Populate rename input
+  if(abFileNameInput){
+    abFileNameInput.value = doc.fileName;
+    abFileNameInput.focus();
+    const lastDot = doc.fileName.lastIndexOf('.');
+    if(lastDot > 0){
+      abFileNameInput.setSelectionRange(0, lastDot);
+    } else {
+      abFileNameInput.select();
+    }
+  }
+
+  if(abOriginalNameHint){
+    abOriginalNameHint.textContent = `Original: ${doc.fileName}`;
+  }
+
+  if(abSelectionHint){
+    abSelectionHint.textContent = `Selected: ${doc.fileName}`;
+  }
+
+  if(btnConfirmAttachBriefcase){
+    btnConfirmAttachBriefcase.disabled = false;
+  }
+}
+
+// Reset button
+document.getElementById('ab_btn_reset_name')?.addEventListener('click', () => {
+  if(!selectedAttachDocId) return;
+  const doc = briefcaseDocuments.find(d => d.id === selectedAttachDocId);
+  if(doc && abFileNameInput){
+    abFileNameInput.value = doc.fileName;
+    abFileNameInput.focus();
+  }
+});
+
+// Category filter chips in attach modal
+document.querySelectorAll('#abFilterChips .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#abFilterChips .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    attachModalActiveFilter = btn.dataset.abfilter;
+    renderAttachBriefcaseList();
+  });
+});
+
+// Manage Briefcase button
+document.getElementById('abManageBriefcaseBtn')?.addEventListener('click', () => {
+  closeAttachBriefcaseModal();
+  openBriefcaseModal();
+});
+
+// Close buttons
+document.getElementById('btnCloseAttachBriefcase')?.addEventListener('click', closeAttachBriefcaseModal);
+document.getElementById('btnCancelAttachBriefcase')?.addEventListener('click', closeAttachBriefcaseModal);
+
+// Confirm Attach
+btnConfirmAttachBriefcase?.addEventListener('click', async () => {
+  if(!selectedAttachDocId || !currentAttachContext) return;
+  const doc = briefcaseDocuments.find(d => d.id === selectedAttachDocId);
+  if(!doc) return;
+
+  let finalName = (abFileNameInput?.value || '').trim() || doc.fileName;
+  // Ensure extension is retained
+  const origExt = doc.fileName.includes('.') ? doc.fileName.slice(doc.fileName.lastIndexOf('.')) : '';
+  if(origExt && !finalName.toLowerCase().endsWith(origExt.toLowerCase())){
+    finalName += origExt;
+  }
+
+  btnConfirmAttachBriefcase.disabled = true;
+  btnConfirmAttachBriefcase.textContent = 'Attaching…';
+
+  try{
+    if(currentAttachContext.targetType === 'job'){
+      const jobId = currentAttachContext.jobId;
+      await api(`/api/jobs/${jobId}/attach-briefcase`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          briefcaseId: doc.id,
+          fileName: finalName
+        })
+      });
+      showToast(`Attached "${finalName}" to application.`);
+      closeAttachBriefcaseModal();
+      await loadJobAttachments(jobId);
+      await loadJobs();
+    } else if(currentAttachContext.targetType === 'newPanel'){
+      const data = await api(`/api/briefcase/${doc.id}/base64`);
+      if(currentAttachContext.onAttach){
+        currentAttachContext.onAttach({
+          fileName: finalName,
+          fileType: data.fileType,
+          fileData: data.fileData,
+          size: data.fileSize
+        });
+      }
+      showToast(`Attached "${finalName}" from Briefcase.`);
+      closeAttachBriefcaseModal();
+    }
+  }catch(err){
+    showToast(err.message);
+  } finally {
+    btnConfirmAttachBriefcase.disabled = false;
+    btnConfirmAttachBriefcase.textContent = 'Attach Document';
+  }
+});
+
+/* =========================================================
+   Email Follow-Up Studio (Natural, Simple Email Layout)
+   ========================================================= */
+
+const studioModal = document.getElementById('draftStudioModal');
+const esFrom = document.getElementById('es_from');
+const esTo = document.getElementById('es_to');
+const esSubject = document.getElementById('es_subject');
+const esBody = document.getElementById('es_body');
+const esSenderName = document.getElementById('es_senderName');
+const previewFrom = document.getElementById('previewFrom');
+const previewTo = document.getElementById('previewTo');
+const previewSubject = document.getElementById('previewSubject');
+const previewBody = document.getElementById('previewBody');
+const previewSender = document.getElementById('previewSender');
+const previewAttList = document.getElementById('previewAttList');
+const previewAttNames = document.getElementById('previewAttNames');
+const esAttachmentsList = document.getElementById('es_attachments_list');
+let activeStudioJob = null;
+
+async function openStudioModal(job, templateKey = 'followup', customText = ''){
+  activeStudioJob = job;
+  const tpl = TEMPLATES[templateKey] || TEMPLATES.followup;
+  const myEmail = appConfig.email || '';
+  const myName = userSenderName || appConfig.senderName || 'Job Applicant';
+  const recName = job.contact ? job.contact.split('@')[0].replace(/[._]/g, ' ') : (job.company ? `${job.company} Hiring Team` : 'Hiring Manager');
+
+  if(esFrom) esFrom.value = myEmail ? `${myEmail} (from .env)` : 'No Gmail configured in .env';
+  esTo.value = job.contact || '';
+  esSenderName.value = myName;
+
+  if(customText){
+    esSubject.value = `Regarding ${job.role || 'application'} at ${job.company || ''}`;
+    esBody.value = customText;
+  } else {
+    esSubject.value = tpl.subject
+      .replace(/{Company}/g, job.company || 'your company')
+      .replace(/{Role}/g, job.role || 'the role')
+      .replace(/{MyName}/g, myName)
+      .replace(/{MyEmail}/g, myEmail)
+      .replace(/{RecipientName}/g, recName);
+
+    esBody.value = tpl.body
+      .replace(/{Company}/g, job.company || 'your company')
+      .replace(/{Role}/g, job.role || 'the role')
+      .replace(/{MyName}/g, myName)
+      .replace(/{MyEmail}/g, myEmail)
+      .replace(/{RecipientName}/g, recName)
+      .replace(/{Date}/g, new Date().toLocaleDateString());
+  }
+
+  // Load and render Briefcase documents
+  await loadBriefcaseDocuments();
+
+  // Load available attachments for this job
+  try{
+    const atts = await api(`/api/jobs/${job.id}/attachments`);
+    currentJobAttachments[job.id] = atts;
+    if(atts.length > 0){
+      esAttachmentsList.innerHTML = atts.map(a => `
+        <label style="display:flex; align-items:center; gap:6px; margin-bottom:4px; cursor:pointer;">
+          <input type="checkbox" value="${a.id}" data-filename="${escapeAttr(a.fileName)}" class="es-att-check" checked>
+          <span>📁 ${escapeHtml(a.fileName)}</span>
+        </label>
+      `).join('');
+      esAttachmentsList.querySelectorAll('.es-att-check').forEach(chk => {
+        chk.addEventListener('change', updateLivePreview);
+      });
+    } else {
+      esAttachmentsList.innerHTML = `<span style="color:var(--muted); font-size:12px;">No documents attached to this application yet.</span>`;
+    }
+  }catch(e){}
+
+  updateLivePreview();
+  studioModal.classList.add('open');
+}
+
+function updateLivePreview(){
+  const myEmail = appConfig.email || 'your-email@gmail.com';
+  const myName = esSenderName.value.trim() || appConfig.senderName || 'Job Applicant';
+  if(previewFrom) previewFrom.textContent = myName ? `${myName} <${myEmail}>` : myEmail;
+  previewTo.textContent = esTo.value || 'recruiter@company.com';
+  previewSubject.textContent = esSubject.value || '(No subject)';
+  previewSender.textContent = myName;
+
+  const text = esBody.value || '';
+  previewBody.textContent = text || 'Message text preview...';
+
+  // Preview checked attachments from both Briefcase and Application
+  const checkedBfAtts = Array.from(document.querySelectorAll('.es-bf-check:checked')).map(c => {
+    const renameInp = document.getElementById(`bf_rename_${c.value}`);
+    const name = (renameInp && renameInp.value.trim()) || c.dataset.filename;
+    return `💼 ${name}`;
+  });
+  const checkedJobAtts = Array.from(document.querySelectorAll('.es-att-check:checked')).map(c => `📁 ${c.dataset.filename}`);
+  const allAtts = [...checkedBfAtts, ...checkedJobAtts];
+
+  if(allAtts.length > 0){
+    previewAttList.style.display = 'block';
+    previewAttNames.textContent = allAtts.join(', ');
+  } else {
+    previewAttList.style.display = 'none';
+  }
+}
+
+esTo.addEventListener('input', updateLivePreview);
+esSubject.addEventListener('input', updateLivePreview);
+esBody.addEventListener('input', updateLivePreview);
+esSenderName.addEventListener('input', ()=>{
+  userSenderName = esSenderName.value.trim();
+  localStorage.setItem('user_sender_name', userSenderName);
+  updateLivePreview();
+});
+
+// Modal template chips
+document.querySelectorAll('#studioTemplateChips .chip-btn').forEach(btn => {
+  btn.addEventListener('click', ()=>{
+    if(activeStudioJob) openStudioModal(activeStudioJob, btn.dataset.tpl);
+  });
+});
+
+// Variable insert tags
+document.querySelectorAll('.var-chip').forEach(chip => {
+  chip.addEventListener('click', ()=>{
+    const tag = chip.dataset.var;
+    const start = esBody.selectionStart || esBody.value.length;
+    const end = esBody.selectionEnd || esBody.value.length;
+    esBody.value = esBody.value.substring(0, start) + tag + esBody.value.substring(end);
+    esBody.focus();
+    updateLivePreview();
+  });
+});
+
+// Send live email via Gmail SMTP with optional attached documents
+document.getElementById('btnSendStudio').addEventListener('click', async ()=>{
+  const to = esTo.value.trim();
+  const subject = esSubject.value.trim();
+  const body = esBody.value.trim();
+  const senderName = esSenderName.value.trim();
+  if(!to || !subject || !body){ showToast('Fill in To, Subject, and Message.'); return; }
+
+  const checkedAttachmentIds = Array.from(document.querySelectorAll('.es-att-check:checked')).map(c => c.value);
+  const checkedBriefcaseDocs = Array.from(document.querySelectorAll('.es-bf-check:checked')).map(c => {
+    const renameInp = document.getElementById(`bf_rename_${c.value}`);
+    return {
+      id: c.value,
+      fileName: (renameInp && renameInp.value.trim()) || c.dataset.filename
+    };
+  });
+
+  const sendBtn = document.getElementById('btnSendStudio');
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending…';
+
+  try{
+    const res = await api('/api/send-email', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        jobId: activeStudioJob?.id,
+        to,
+        subject,
+        body,
+        senderName,
+        attachmentIds: checkedAttachmentIds,
+        briefcaseDocIds: checkedBriefcaseDocs
+      })
+    });
+    const totalAttached = checkedAttachmentIds.length + checkedBriefcaseDocs.length;
+    showToast(`Email sent via Gmail from ${res.from || appConfig.email || 'account'}!${totalAttached ? ` (${totalAttached} document${totalAttached > 1 ? 's' : ''} attached)` : ''}`);
+    studioModal.classList.remove('open');
+    if(activeStudioJob){
+      await loadConversationMessages(activeStudioJob.id);
+      await loadJobs();
+    }
+  }catch(e){
+    showToast(e.message);
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send via Gmail';
+  }
+});
+
+document.getElementById('btnCloseStudio').addEventListener('click', ()=> studioModal.classList.remove('open'));
+document.getElementById('btnCancelStudio').addEventListener('click', ()=> studioModal.classList.remove('open'));
+document.getElementById('btnCopyStudio').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(`Subject: ${esSubject.value}\n\n${esBody.value}`);
+  showToast('Copied draft to clipboard.');
+});
+
+/* =========================================================
+   Automated Reply Checking & Notifications
+   ========================================================= */
+
+async function triggerAutoCheck(){
+  if(isChecking) return;
+  isChecking = true;
+  syncSpin.style.transform = 'rotate(360deg)';
+  autocheckLabel.textContent = 'Checking Gmail…';
+
+  try{
+    const res = await api('/api/check-all-replies', {method:'POST'});
+    if(res.newRepliesCount > 0){
+      playChime();
+      showToast(`🎉 Found ${res.newRepliesCount} new reply!`);
+      triggerDesktopNotification('New job email reply received', `${res.newRepliesCount} new reply in inbox.`);
+      await loadJobs();
+      if(expandedId) await loadConversationMessages(expandedId);
+    } else {
+      showToast(`Checked ${res.checkedJobsCount} jobs: Inbox up to date.`);
+    }
+  }catch(e){
+    showToast(e.message);
+  } finally {
+    isChecking = false;
+    syncSpin.style.transform = 'none';
+    autocheckLabel.textContent = 'Gmail Auto-check: Active';
+  }
+}
+
+autocheckPill.addEventListener('click', triggerAutoCheck);
+document.getElementById('btnCheckAll').addEventListener('click', triggerAutoCheck);
+
+async function checkNotifications(){
+  try{
+    const n = await api('/api/notifications');
+    if(n.unreadCount > 0){
+      autocheckLabel.textContent = `Gmail: ${n.unreadCount} unread reply!`;
+    }
+  }catch(e){}
+}
+setInterval(checkNotifications, 30000);
+
+/* =========================================================
+   New Entry Panel with Document Attachments Support
+   ========================================================= */
+
+function openNewPanel(prefill){
+  const job = Object.assign(emptyJob(), prefill||{});
+  let newPanelFiles = []; // Array of { fileName, fileType, fileData, size }
+
+  mainArea.insertAdjacentHTML('afterbegin', `
+    <div class="panel" id="newPanel">
+      <h3>New application</h3>
+      <div class="detail-grid">
+        <div class="field"><label>Company *</label><input type="text" id="np_company" value="${escapeAttr(job.company)}"></div>
+    <div class="field"><label>Role *</label><input type="text" id="np_role" value="${escapeAttr(job.role)}"></div>
+    <div class="field"><label>Date applied</label><input type="date" id="np_date" value="${job.dateApplied}"></div>
+    <div class="field"><label>Status</label><select id="np_status">${STATUSES.map(s=>`<option value="${s}" ${job.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>Location</label><input type="text" id="np_location" value="${escapeAttr(job.location)}" placeholder="Remote / City"></div>
+    <div class="field"><label>Salary range</label><input type="text" id="np_salary" value="${escapeAttr(job.salary)}" placeholder="$30k - $50k"></div>
+    <div class="field"><label>Contact / recruiter email</label><input type="text" id="np_contact" value="${escapeAttr(job.contact)}" placeholder="recruiter@company.com"></div>
+    <div class="field"><label>Job posting URL</label><input type="text" id="np_url" value="${escapeAttr(job.url)}" placeholder="https://"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="np_notes">${escapeHtml(job.notes)}</textarea></div>
+    <!-- Document Attachments in New Application Form -->
+      <div class="field" style="margin-top:14px;">
+        <label>Attach documents (Resume, CV, Cover Letter, Portfolio, JD...)</label>
+        <div class="attach-zone">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span style="font-size:12px; color:var(--muted);" id="np_file_hint">Attach files to keep with this application</span>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn secondary" style="font-size:11.5px; padding:3px 9px;" id="np_btn_briefcase">💼 From Briefcase</button>
+              <input type="file" id="np_file_input" multiple accept=".pdf,.doc,.docx,.txt,.rtf,.png,.jpg,.jpeg" style="display:none;">
+              <button type="button" class="btn secondary" style="font-size:11.5px; padding:3px 9px;" id="np_btn_add_file">📎 Upload file</button>
+            </div>
+          </div>
+          <div class="attach-list" id="np_file_list"></div>
+        </div>
+      </div>
+    <div class="panel-actions">
+        <button class="btn secondary" id="np_cancel">Cancel</button>
+        <button class="btn" id="np_save">Add to ledger</button>
+      </div>
+    </div>
+  `);
+
+  const fileInput = document.getElementById('np_file_input');
+  const btnAddFile = document.getElementById('np_btn_add_file');
+  const fileList = document.getElementById('np_file_list');
+  const fileHint = document.getElementById('np_file_hint');
+
+  btnAddFile.addEventListener('click', () => fileInput.click());
+  document.getElementById('np_btn_briefcase')?.addEventListener('click', () => {
+    const comp = document.getElementById('np_company')?.value.trim();
+    const role = document.getElementById('np_role')?.value.trim();
+    openAttachBriefcaseModal({
+      targetType: 'newPanel',
+      company: comp,
+      role: role,
+      onAttach: (fileObj) => {
+        newPanelFiles.push(fileObj);
+        renderNewPanelFiles();
+      }
+    });
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const selected = Array.from(e.target.files);
+    if(!selected.length) return;
+
+    selected.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        newPanelFiles.push({
+          fileName: file.name,
+          fileType: file.type || 'application/octet-stream',
+          fileData: reader.result,
+          size: file.size
+        });
+        renderNewPanelFiles();
+      };
+      reader.readAsDataURL(file);
+    });
+    fileInput.value = '';
+  });
+
+  function renderNewPanelFiles(){
+    if(!newPanelFiles.length){
+      fileList.innerHTML = '';
+      fileHint.textContent = 'Attach files to keep with this application';
+      return;
+    }
+    fileHint.textContent = `${newPanelFiles.length} file${newPanelFiles.length===1?'':'s'} attached`;
+    fileList.innerHTML = newPanelFiles.map((f, i) => {
+      const sizeKb = Math.round(f.size / 1024);
+      return `
+        <div class="attach-item">
+          <div class="attach-name">
+            <span>📄</span>
+            <span>${escapeHtml(f.fileName)}</span>
+            <span class="attach-size">(${sizeKb} KB)</span>
+          </div>
+          <div class="attach-actions">
+            <button type="button" class="btn secondary" style="font-size:11px; padding:1px 6px;" onclick="renameNewPanelFile(${i})">✏️ Rename</button>
+            <button type="button" class="attach-del" onclick="removeNewPanelFile(${i})">×</button>
+          </div>
+        </div>
+    `;
+    }).join('');
+  }
+
+  window.renameNewPanelFile = function(index){
+    const f = newPanelFiles[index];
+    if(!f) return;
+    const newName = prompt('Enter new filename for this attachment:', f.fileName);
+    if(!newName || newName.trim() === '' || newName.trim() === f.fileName) return;
+    let clean = newName.trim();
+    const origExt = f.fileName.includes('.') ? f.fileName.slice(f.fileName.lastIndexOf('.')) : '';
+    if(origExt && !clean.toLowerCase().endsWith(origExt.toLowerCase())){
+      clean += origExt;
+    }
+    f.fileName = clean;
+    renderNewPanelFiles();
+  };
+
+  document.getElementById('np_cancel').addEventListener('click', ()=>{ document.getElementById('newPanel').remove(); });
+  document.getElementById('np_save').addEventListener('click', async ()=>{
+    job.company = document.getElementById('np_company').value.trim();
+    job.role = document.getElementById('np_role').value.trim();
+    job.dateApplied = document.getElementById('np_date').value;
+    job.status = document.getElementById('np_status').value;
+    job.location = document.getElementById('np_location').value.trim();
+    job.salary = document.getElementById('np_salary').value.trim();
+    job.contact = document.getElementById('np_contact').value.trim();
+    job.url = document.getElementById('np_url').value.trim();
+    job.notes = document.getElementById('np_notes').value.trim();
+    if(!job.company){ alert('Add a company name before saving.'); return; }
+
+    const payload = Object.assign({}, job, { attachments: newPanelFiles });
+
+    try{
+      const res = await api('/api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      job.id = res.id;
+    }catch(e){ showToast(e.message); return; }
+    document.getElementById('newPanel').remove();
+    showToast('Added to ledger.');
+    expandedId = job.id;
+    await loadJobs();
+  });
+}
+
+function openPastePanel(){
+  mainArea.insertAdjacentHTML('afterbegin', `
+    <div class="panel" id="pastePanel">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div>
+          <h3 style="margin:0 0 3px 0;">Onboard Existing Application</h3>
+          <p class="hint" style="margin:0;">Import an existing application and bring its full email conversation into the chat.</p>
+        </div>
+        <button class="btn secondary" id="pp_cancel" style="padding:2px 8px; font-size:12px;">✕</button>
+      </div>
+
+      <!-- Mode selection tabs -->
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <button type="button" class="chip-btn active" id="tabModeEmail">✉️ By Recruiter / Recipient Email</button>
+        <button type="button" class="chip-btn" id="tabModePaste">📋 Paste Email or Thread Text</button>
+      </div>
+
+      <!-- Mode 1: Fetch by Recruiter/Recipient Email -->
+      <div id="modeEmailSection" style="background:#fff; border:1px solid var(--paper-line); padding:14px; border-radius:2px; margin-bottom:12px;">
+        <label style="display:block; font-size:11.5px; font-weight:700; color:var(--amber-deep); text-transform:uppercase; margin-bottom:6px;">
+          Recruiter or Contact Email
+        </label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="email" id="pp_fetch_email" placeholder="e.g. recruiter@company.com or hiring@acme.com" style="flex:1; padding:8px 12px; font-size:13.5px; border:1px solid var(--paper-line); border-radius:2px; font-family:'IBM Plex Mono', monospace; background:#fff;">
+          <button type="button" class="btn" id="pp_btn_fetch_gmail" style="white-space:nowrap; padding:8px 16px;">
+            🔍 Fetch Conversation
+          </button>
+        </div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:6px;">
+          💡 Pulls all sent & received emails with this address from your connected Gmail, detects role & company, and builds the conversation thread.
+        </div>
+      </div>
+
+      <!-- Mode 2: Paste Email / Thread Text -->
+      <div id="modePasteSection" style="background:#fff; border:1px solid var(--paper-line); padding:14px; border-radius:2px; margin-bottom:12px; display:none;">
+        <label style="display:block; font-size:11.5px; font-weight:700; color:var(--amber-deep); text-transform:uppercase; margin-bottom:6px;">
+          Paste Email or Full Conversation Thread
+        </label>
+        <textarea id="emailPaste" placeholder="Paste the confirmation email, recruiter outreach, or the entire copied email thread here…" style="width:100%; min-height:120px; font-family:inherit; font-size:13px; padding:10px; border:1px solid var(--paper-line); border-radius:2px; line-height:1.4;"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span style="font-size:11.5px; color:var(--muted);">Parses company, role, dates, senders, and every reply in the thread.</span>
+          <button type="button" class="btn" id="pp_parse" style="padding:7px 16px;">Scan & Extract</button>
+        </div>
+      </div>
+
+      <!-- Loading Spinner -->
+      <div id="pp_loading" style="display:none; padding:20px; text-align:center; color:var(--muted); font-size:13px;">
+        <span class="spin-icon" style="display:inline-block; animation:spin 1s linear infinite;">🔄</span> Connecting to Gmail & retrieving conversation history…
+      </div>
+
+      <!-- Result Container -->
+      <div id="pp_result"></div>
+    </div>
+  `);
+
+  const tabEmail = document.getElementById('tabModeEmail');
+  const tabPaste = document.getElementById('tabModePaste');
+  const secEmail = document.getElementById('modeEmailSection');
+  const secPaste = document.getElementById('modePasteSection');
+  const loadingEl = document.getElementById('pp_loading');
+  const resultBox = document.getElementById('pp_result');
+
+  document.getElementById('pp_cancel')?.addEventListener('click', () => {
+    document.getElementById('pastePanel')?.remove();
+  });
+
+  tabEmail.addEventListener('click', () => {
+    tabEmail.classList.add('active');
+    tabPaste.classList.remove('active');
+    secEmail.style.display = 'block';
+    secPaste.style.display = 'none';
+  });
+
+  tabPaste.addEventListener('click', () => {
+    tabPaste.classList.add('active');
+    tabEmail.classList.remove('active');
+    secPaste.style.display = 'block';
+    secEmail.style.display = 'none';
+  });
+
+  // Handler for Fetch by Email
+  document.getElementById('pp_btn_fetch_gmail')?.addEventListener('click', async () => {
+    const email = document.getElementById('pp_fetch_email')?.value.trim();
+    if(!email){
+      showToast('Enter a recipient/recruiter email address first.');
+      return;
+    }
+    loadingEl.style.display = 'block';
+    resultBox.innerHTML = '';
+
+    try {
+      const data = await api('/api/fetch-thread-by-email', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email })
+      });
+      renderOnboardResult({
+        company: data.detectedCompany || '',
+        role: data.detectedRole || '',
+        status: data.detectedStatus || 'Applied',
+        contact: data.contact || email,
+        dateApplied: data.dateApplied || new Date().toISOString().slice(0, 10),
+        messages: data.messages || []
+      });
+    } catch(err) {
+      showToast(err.message);
+      resultBox.innerHTML = `<div style="padding:12px; background:var(--rust-bg); color:var(--rust); font-size:12.5px; border-radius:2px;">${escapeHtml(err.message)}</div>`;
+    } finally {
+      loadingEl.style.display = 'none';
+    }
+  });
+
+  // Handler for Scan Pasted Text
+  document.getElementById('pp_parse')?.addEventListener('click', () => {
+    const text = document.getElementById('emailPaste')?.value || '';
+    if(!text.trim()){
+      showToast('Paste email text first.');
+      return;
+    }
+    const parsed = parsePastedEmailThread(text, appConfig?.email);
+    renderOnboardResult(parsed, text);
+  });
+
+  function renderOnboardResult(data, rawText = ''){
+    const existingMatch = data.company ? jobs.find(j => j.company && j.company.toLowerCase().includes(data.company.toLowerCase())) : null;
+    const msgs = data.messages || [];
+
+    resultBox.innerHTML = `
+      <div style="background:var(--card); border:1px solid var(--paper-line); padding:16px; border-radius:2px; margin-top:10px;">
+        <div style="font-family:'Source Serif 4', serif; font-size:15px; font-weight:600; margin-bottom:10px;">
+          Review Application Details
+        </div>
+        <div class="detail-grid">
+          <div class="field"><label>Company *</label><input type="text" id="ob_company" value="${escapeAttr(data.company)}" placeholder="Company Name"></div>
+          <div class="field"><label>Role *</label><input type="text" id="ob_role" value="${escapeAttr(data.role)}" placeholder="Job Role"></div>
+          <div class="field"><label>Date applied</label><input type="date" id="ob_date" value="${data.dateApplied || new Date().toISOString().slice(0,10)}"></div>
+          <div class="field"><label>Status</label><select id="ob_status">${STATUSES.map(s=>`<option value="${s}" ${s===data.status?'selected':''}>${s}</option>`).join('')}</select></div>
+          <div class="field" style="grid-column: 1 / -1;"><label>Contact / Recruiter email</label><input type="email" id="ob_contact" value="${escapeAttr(data.contact)}" placeholder="recruiter@company.com"></div>
+        </div>
+
+        <!-- Conversation Messages Preview -->
+        <div style="margin-top:14px; background:var(--chat-canvas); border:1px solid var(--paper-line); padding:10px 12px; border-radius:2px;">
+          <div style="font-size:12px; font-weight:700; color:var(--ink); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>💬 Conversation thread to import (${msgs.length} message${msgs.length===1?'':'s'}):</span>
+            <span style="font-size:11px; font-weight:normal; color:var(--muted);">Imported directly into WhatsApp chat</span>
+          </div>
+          ${msgs.length > 0 ? `
+            <div style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto; padding-right:2px;">
+              ${msgs.map(m => `
+                <div style="background:${m.direction==='outgoing'?'var(--chat-bubble-out)':'#fff'}; border:1px solid rgba(0,0,0,0.06); padding:6px 10px; border-radius:4px; font-size:12px; align-self:${m.direction==='outgoing'?'flex-end':'flex-start'}; max-width:85%;">
+                  <div style="font-weight:600; font-size:11px; color:var(--ink); display:flex; justify-content:space-between; gap:12px;">
+                    <span>${escapeHtml(m.direction==='outgoing'?'You':m.sender)}</span>
+                    <span style="font-weight:normal; color:var(--muted);">${new Date(m.timestamp).toLocaleDateString([], {month:'short', day:'numeric'})}</span>
+                  </div>
+                  ${m.subject ? `<div style="font-weight:500; font-size:11.5px; color:var(--slate); margin:1px 0;">✉️ ${escapeHtml(m.subject)}</div>` : ''}
+                  <div style="color:var(--ink); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(m.body)}</div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div style="font-size:12px; color:var(--muted); font-style:italic;">No messages extracted yet.</div>
+          `}
+        </div>
+
+        <!-- Gmail sync checkbox -->
+        <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="ob_sync_gmail" ${appConfig.hasCreds ? 'checked' : 'disabled'}>
+          <span>Sync full email thread from Gmail for this contact (fetches any additional replies & sent messages)</span>
+        </label>
+
+        <!-- Actions -->
+        <div class="panel-actions" style="margin-top:14px;">
+          ${existingMatch ? `<button class="btn secondary" id="ob_update">Update existing entry for "${escapeHtml(existingMatch.company)}"</button>` : ''}
+          <button class="btn" id="ob_save">🚀 Onboard Application & Add Conversation</button>
+        </div>
+      </div>
+    `;
+
+    // Handler for saving as new onboarded application
+    document.getElementById('ob_save')?.addEventListener('click', async () => {
+      const company = document.getElementById('ob_company')?.value.trim();
+      const role = document.getElementById('ob_role')?.value.trim();
+      const dateApplied = document.getElementById('ob_date')?.value;
+      const status = document.getElementById('ob_status')?.value;
+      const contact = document.getElementById('ob_contact')?.value.trim();
+      const syncGmail = document.getElementById('ob_sync_gmail')?.checked;
+
+      if(!company){
+        alert('Please enter a company name.');
+        return;
+      }
+
+      const btn = document.getElementById('ob_save');
+      btn.disabled = true;
+      btn.textContent = 'Onboarding…';
+
+      try {
+        const payload = {
+          company,
+          role,
+          dateApplied,
+          status,
+          contact,
+          notes: rawText ? `— From pasted email —\n${rawText.slice(0, 400)}` : '',
+          messages: msgs,
+          syncGmail
+        };
+
+        const res = await api('/api/onboard-job', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+
+        document.getElementById('pastePanel')?.remove();
+        showToast(`🎉 Onboarded "${company}" with ${res.messagesCount} message(s) in conversation!`);
+        expandedId = res.id;
+        await loadJobs();
+      } catch(err) {
+        showToast(err.message);
+        btn.disabled = false;
+        btn.textContent = '🚀 Onboard Application & Add Conversation';
+      }
+    });
+
+    // Handler for updating existing application
+    if(existingMatch){
+      document.getElementById('ob_update')?.addEventListener('click', async () => {
+        const btn = document.getElementById('ob_update');
+        btn.disabled = true;
+        btn.textContent = 'Updating…';
+
+        try {
+          const status = document.getElementById('ob_status')?.value || existingMatch.status;
+          const contact = document.getElementById('ob_contact')?.value.trim() || existingMatch.contact;
+          existingMatch.status = status;
+          if(contact) existingMatch.contact = contact;
+
+          await api(`/api/jobs/${existingMatch.id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(existingMatch)
+          });
+
+          // Insert all parsed messages into existing job
+          for(const m of msgs){
+            await api(`/api/jobs/${existingMatch.id}/messages`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                direction: m.direction || 'incoming',
+                sender: m.sender || 'Recruiter',
+                recipient: m.recipient || '',
+                subject: m.subject || 'Email Update',
+                body: m.body || '',
+                statusHint: m.statusHint || status
+              })
+            });
+          }
+
+          // If sync Gmail is checked
+          if(document.getElementById('ob_sync_gmail')?.checked){
+            await api(`/api/jobs/${existingMatch.id}/sync-thread`, { method: 'POST' });
+          }
+
+          document.getElementById('pastePanel')?.remove();
+          expandedId = existingMatch.id;
+          showToast(`Updated "${existingMatch.company}" and added conversation messages!`);
+          await loadJobs();
+        } catch(err) {
+          showToast(err.message);
+          btn.disabled = false;
+          btn.textContent = `Update existing entry for "${existingMatch.company}"`;
+        }
+      });
+    }
+  }
+}
+
+function parsePastedEmailThread(text, userEmail = ''){
+  const raw = (text || '').trim();
+  if(!raw) return { company: '', role: '', status: 'Applied', contact: '', dateApplied: '', messages: [] };
+
+  const lower = raw.toLowerCase();
+  const myEmail = (userEmail || appConfig?.email || '').toLowerCase().trim();
+
+  // 1. Detect Status
+  let status = 'Applied';
+  if(/(unfortunately|not moving forward|other candidates|decided to proceed with|will not be moving|not be extending|position has been filled)/i.test(lower)) {
+    status = 'Rejected';
+  } else if(/(pleased to offer|extend an offer|offer of employment|welcome to the team|excited to offer|formal offer)/i.test(lower)) {
+    status = 'Offer';
+  } else if(/(interview|schedule a call|next steps|speak with|chat with you|meet with|zoom meeting|phone screen|discussion)/i.test(lower)) {
+    status = 'Interviewing';
+  } else if(/(thank you for applying|application received|we.?ve received your application|application has been received|thank you for your interest)/i.test(lower)) {
+    status = 'Applied';
+  }
+
+  // 2. Detect Role
+  let role = '';
+  const roleMatch = raw.match(/for the\s+([A-Za-z0-9 &\-\/]{2,50}?)\s+(?:position|role|opening|job)/i) ||
+                    raw.match(/as a(?:n)?\s+([A-Za-z0-9 &\-\/]{2,50}?)\s+at/i) ||
+                    raw.match(/role:\s*([A-Za-z0-9 &\-\/]{2,50})/i) ||
+                    raw.match(/position:\s*([A-Za-z0-9 &\-\/]{2,50})/i) ||
+                    raw.match(/(?:re:|fwd:)?\s*([A-Za-z0-9 &\-\/]{2,40}?)\s+application/i);
+  if(roleMatch && roleMatch[1]) {
+    role = roleMatch[1].trim();
+  }
+
+  // 3. Detect Company
+  let company = '';
+  const companyMatch = raw.match(/applying to\s+([A-Z][A-Za-z0-9 &.\-]{1,35})/i) ||
+                       raw.match(/interest in\s+([A-Z][A-Za-z0-9 &.\-]{1,35})/i) ||
+                       raw.match(/welcome to\s+([A-Z][A-Za-z0-9 &.\-]{1,35})/i) ||
+                       raw.match(/The\s+([A-Z][A-Za-z0-9 &.\-]{1,35})\s+Team/i) ||
+                       raw.match(/at\s+([A-Z][A-Za-z0-9 &.\-]{1,35})(?:[\.,!\n]|\s+Team|\s+Careers)/i);
+  if(companyMatch && companyMatch[1]) {
+    company = companyMatch[1].trim();
+  }
+
+  // 4. Detect Recipient / Recruiter Contact Email
+  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+  const foundEmails = Array.from(raw.matchAll(emailRegex)).map(m => m[1]);
+  let contact = '';
+  const externalEmails = foundEmails.filter(e => !myEmail || e.toLowerCase() !== myEmail);
+  if(externalEmails.length > 0) {
+    contact = externalEmails[0];
+  } else if(foundEmails.length > 0) {
+    contact = foundEmails[0];
+  }
+
+  // If company still empty, try domain from contact
+  if(!company && contact && contact.includes('@')) {
+    const domain = contact.split('@')[1].toLowerCase();
+    const commonMail = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'proton.me', 'protonmail.com'];
+    if(!commonMail.includes(domain)) {
+      const namePart = domain.split('.')[0];
+      company = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    }
+  }
+
+  // 5. Detect Date Applied
+  let dateApplied = new Date().toISOString().slice(0, 10);
+  const dateMatch = raw.match(/Date:\s*([A-Za-z0-9, :+-]+)/i) ||
+                    raw.match(/Sent:\s*([A-Za-z0-9, :+-]+)/i) ||
+                    raw.match(/On\s+([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
+  if(dateMatch && dateMatch[1]){
+    const parsedD = new Date(dateMatch[1]);
+    if(!isNaN(parsedD.getTime())){
+      dateApplied = parsedD.toISOString().slice(0, 10);
+    }
+  }
+
+  // 6. Split into Conversation Messages
+  const messages = [];
+  const threadSplitRegex = /(?=(?:^-{3,}.*?-{3,}$|^\s*On\s+.+?wrote:\s*$|^\s*From:\s+.+?(?:\n|\r\n)\s*Sent:\s+|^\s*From:\s+.+?(?:\n|\r\n)\s*Date:\s+))/im;
+  const rawChunks = raw.split(threadSplitRegex).map(c => c.trim()).filter(Boolean);
+
+  if(rawChunks.length > 1){
+    for(const chunk of rawChunks){
+      const fromMatch = chunk.match(/From:\s*([^<\r\n]+)?<?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})?>?/i);
+      const onMatch = chunk.match(/On\s+([A-Za-z0-9, :]+?)\s*,?\s*([^<\r\n]+)?<?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)?>?\s+wrote:/i);
+      const subjMatch = chunk.match(/Subject:\s*([^\r\n]+)/i);
+      const dateHeaderMatch = chunk.match(/(?:Date|Sent):\s*([^\r\n]+)/i);
+
+      let senderAddr = (fromMatch && fromMatch[2]) || (onMatch && onMatch[3]) || '';
+      let senderName = (fromMatch && fromMatch[1]?.trim()) || (onMatch && onMatch[2]?.trim()) || '';
+      let msgSubject = (subjMatch && subjMatch[1]?.trim()) || (role ? `Application: ${role}` : 'Email Note');
+      let msgTimestamp = new Date().toISOString();
+
+      if(dateHeaderMatch && dateHeaderMatch[1]){
+        const d = new Date(dateHeaderMatch[1]);
+        if(!isNaN(d.getTime())) msgTimestamp = d.toISOString();
+      } else if(onMatch && onMatch[1]){
+        const d = new Date(onMatch[1]);
+        if(!isNaN(d.getTime())) msgTimestamp = d.toISOString();
+      }
+
+      const isFromMe = (senderAddr && myEmail && senderAddr.toLowerCase() === myEmail) ||
+                       (!senderAddr && myEmail && !senderName.toLowerCase().includes('recruiter'));
+      const direction = isFromMe ? 'outgoing' : 'incoming';
+
+      let bodyText = chunk
+        .replace(/^-{3,}.*?-{3,}\s*/im, '')
+        .replace(/^On\s+.+?wrote:\s*/im, '')
+        .replace(/^(?:From|To|Sent|Date|Subject):[^\r\n]*\r?\n/gim, '')
+        .replace(/^>+\s?/gm, '')
+        .trim();
+
+      if(bodyText.length > 0){
+        messages.push({
+          direction,
+          sender: isFromMe ? 'You' : (senderName || senderAddr || contact || 'Recruiter'),
+          recipient: isFromMe ? (contact || 'Recruiter') : (myEmail || 'You'),
+          subject: msgSubject,
+          body: bodyText,
+          timestamp: msgTimestamp,
+          statusHint: parseEmailStatus(msgSubject + '\n' + bodyText)
+        });
+      }
+    }
+  }
+
+  if(messages.length === 0){
+    const fromMatch = raw.match(/From:\s*([^<\r\n]+)?<?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})?>?/i);
+    const senderAddr = fromMatch && fromMatch[2];
+    const isFromMe = senderAddr && myEmail && senderAddr.toLowerCase() === myEmail;
+
+    let cleanBody = raw
+      .replace(/^(?:From|To|Sent|Date|Subject):[^\r\n]*\r?\n/gim, '')
+      .replace(/^>+\s?/gm, '')
+      .trim();
+
+    const subjMatch = raw.match(/Subject:\s*([^\r\n]+)/i);
+
+    messages.push({
+      direction: isFromMe ? 'outgoing' : 'incoming',
+      sender: isFromMe ? 'You' : (contact || 'Recruiter'),
+      recipient: isFromMe ? (contact || 'Recruiter') : (myEmail || 'You'),
+      subject: subjMatch ? subjMatch[1].trim() : (role ? `Regarding ${role} at ${company || 'Company'}` : 'Initial Email'),
+      body: cleanBody || raw,
+      timestamp: new Date().toISOString(),
+      statusHint: status
+    });
+  }
+
+  messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  return { company, role, status, contact, dateApplied, messages };
+}
+
+function parseEmailText(text){
+  return parsePastedEmailThread(text, appConfig?.email);
+}
+
+function formatDate(d){
+  if(!d) return '—';
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+function escapeHtml(str){ return (str||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(str){ return escapeHtml(str); }
+
+document.getElementById('btnNew').addEventListener('click', ()=>{
+  document.getElementById('pastePanel')?.remove(); document.getElementById('newPanel')?.remove();
+  openNewPanel();
+});
+document.getElementById('btnPaste').addEventListener('click', ()=>{
+  document.getElementById('newPanel')?.remove(); document.getElementById('pastePanel')?.remove();
+  openPastePanel();
+});
+document.getElementById('btnReset').addEventListener('click', async ()=>{
+  if(!confirm('This will permanently delete every application and all attachments in your ledger. Continue?')) return;
+  try{ await api('/api/jobs', {method:'DELETE'}); }catch(e){ showToast(e.message); return; }
+  jobs = []; expandedId = null; showToast('Ledger cleared.'); render();
+});
+
+if ("Notification" in window && Notification.permission === "default") {
+  Notification.requestPermission();
+}
+
+loadConfig();
+loadJobs();
+loadBriefcaseDocuments();
+</script>
+</body>
+</html>
